@@ -1,0 +1,81 @@
+Classfile /D:/IdeaProject/JUC/src/main/java/synchronizedTest/Test.class
+  Last modified 2019-10-12; size 383 bytes
+  MD5 checksum 09efe46c39fe16434f38514a3c85efbd
+  Compiled from "Test.java"
+class synchronizedTest.Test
+  minor version: 0
+  major version: 52
+  flags: ACC_SUPER
+Constant pool:
+   #1 = Methodref          #5.#17         // java/lang/Object."<init>":()V
+   #2 = Fieldref           #4.#18         // synchronizedTest/Test.count:I
+   #3 = Fieldref           #4.#19         // synchronizedTest/Test.classCount:I
+   #4 = Class              #20            // synchronizedTest/Test
+   #5 = Class              #21            // java/lang/Object
+   #6 = Utf8               count
+   #7 = Utf8               I
+   #8 = Utf8               classCount
+   #9 = Utf8               <init>
+  #10 = Utf8               ()V
+  #11 = Utf8               Code
+  #12 = Utf8               LineNumberTable
+  #13 = Utf8               bump
+  #14 = Utf8               classBump
+  #15 = Utf8               SourceFile
+  #16 = Utf8               Test.java
+  #17 = NameAndType        #9:#10         // "<init>":()V
+  #18 = NameAndType        #6:#7          // count:I
+  #19 = NameAndType        #8:#7          // classCount:I
+  #20 = Utf8               synchronizedTest/Test
+  #21 = Utf8               java/lang/Object
+{
+  int count;
+    descriptor: I
+    flags:
+
+  static int classCount;
+    descriptor: I
+    flags: ACC_STATIC
+
+  synchronizedTest.Test();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 3: 0
+
+  synchronized void bump();
+    descriptor: ()V
+    flags: ACC_SYNCHRONIZED
+    Code:
+      stack=3, locals=1, args_size=1
+         0: aload_0
+         1: dup
+         2: getfield      #2                  // Field count:I
+         5: iconst_1
+         6: iadd
+         7: putfield      #2                  // Field count:I
+        10: return
+      LineNumberTable:
+        line 6: 0
+        line 7: 10
+
+  static synchronized void classBump();
+    descriptor: ()V
+    flags: ACC_STATIC, ACC_SYNCHRONIZED
+    Code:
+      stack=2, locals=0, args_size=0
+         0: getstatic     #3                  // Field classCount:I
+         3: iconst_1
+         4: iadd
+         5: putstatic     #3                  // Field classCount:I
+         8: return
+      LineNumberTable:
+        line 10: 0
+        line 11: 8
+}
+SourceFile: "Test.java"
