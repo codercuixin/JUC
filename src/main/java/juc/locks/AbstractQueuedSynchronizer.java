@@ -41,8 +41,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.AbstractOwnableSynchronizer;
-import java.util.concurrent.locks.LockSupport;
 
 /**
  * 提供一个框架，用于实现依赖于先进先出（FIFO）等待队列的阻塞锁和相关的同步器（信号量，事件等）。
@@ -257,7 +255,7 @@ public abstract class AbstractQueuedSynchronizer
      * CLH锁通常用于自旋锁。相反，我们将它们用于阻塞同步器，但是使用相同的基本策略，
      * 即将有关线程的某些控制信息保存在其节点的前任节点中。
      * 每个节点中的“status”字段将跟踪线程是否应阻塞。
-     * 节点的前任节点释放锁时会发出信号。否则，队列的每个节点都充当一个特定通知样式的monitor，
+     * 节点的前任节点释放锁时会发出信号。否则，队列的每个节点都充当一个特定信号样式的monitor，
      * 该monitor包含一个等待线程。虽然status字段不控制是否授予线程锁等。
      * 如果线程排在队列的第一个，那么该线程可能会尝试获取锁。
      * 但是作为第一个尝试获取锁的线程并不能保证成功。它只赋予了争用锁的权利。
@@ -282,7 +280,7 @@ public abstract class AbstractQueuedSynchronizer
      * http://www.cs.rochester.edu/u/scott/synchronization/
      *
      * <p>我们还使用“next”节点来实现阻塞机制。每个节点的线程ID保留在其自己的节点中，
-     * 因此，前继节点通过遍历下一个链接以确定它是哪个线程，来通知下一个节点唤醒。
+     * 因此，前继节点通过遍历下一个链接以确定它是哪个线程，来信号下一个节点唤醒。
      * 确定后继者必须避免与新排队的节点竞争以设置其前继节点的“ next”字段。
      * 在必要时，如果节点的后继节点似乎为空时，则可以通过原子更新“tail”节点，向后检查来解决此问题。
      *（或者换句话说，next链接是一种优化，因此我们通常不需要向后扫描。）
@@ -680,26 +678,25 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * Checks and updates status for a node that failed to acquire.
-     * Returns true if thread should block. This is the main signal
-     * control in all acquire loops.  Requires that pred == node.prev.
+     * 检查并更新无法获取的节点的状态。
+     * 如果线程应阻塞，则返回true。
+     * 这是所有acquire循环中的主要信号控制。 要求pred == node.prev。
      *
-     * @param pred node's predecessor holding status
-     * @param node the node
-     * @return {@code true} if thread should block
+     * @param pred 节点的前继节点保存节点状态
+     * @param node 节点
+     * @return {@code true} 如果线程需要阻塞
      */
     private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         int ws = pred.waitStatus;
         if (ws == Node.SIGNAL)
             /*
-             * This node has already set status asking a release
-             * to signal it, so it can safely park.
+             * 该节点已经设置了状态，要求一个释放以发出信号，以便可以安全地停放。
              */
             return true;
         if (ws > 0) {
             /*
-             * Predecessor was cancelled. Skip over predecessors and
-             * indicate retry.
+             * 前继节点被取消了。
+             * 跳过被取消的前继节点并且一直重试。
              */
             do {
                 node.prev = pred = pred.prev;
@@ -707,9 +704,9 @@ public abstract class AbstractQueuedSynchronizer
             pred.next = node;
         } else {
             /*
-             * waitStatus must be 0 or PROPAGATE.  Indicate that we
-             * need a signal, but don't park yet.  Caller will need to
-             * retry to make sure it cannot acquire before parking.
+             * waitStatus必须为0或PROPAGATE。
+             * 表示我们需要一个信号，但不要park。
+             * 调用者将需要重试以确保在parking之前无法获取。
              */
             compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
         }
@@ -724,9 +721,9 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * Convenience method to park and then check if interrupted
+     * park的便捷方法，然后检查是否中断
      *
-     * @return {@code true} if interrupted
+     * @return {@code true} 如果中断
      */
     private final boolean parkAndCheckInterrupt() {
         LockSupport.park(this);
@@ -743,12 +740,12 @@ public abstract class AbstractQueuedSynchronizer
      */
 
     /**
-     * Acquires in exclusive uninterruptible mode for thread already in
-     * queue. Used by condition wait methods as well as acquire.
+     * 以排他的不间断模式获取已在队列中的线程。
+     * 被条件等待方法以及acquire方法使用。
      *
-     * @param node the node
-     * @param arg the acquire argument
-     * @return {@code true} if interrupted while waiting
+     * @param node 节点
+     * @param arg acquire参数
+     * @return {@code true} 如果在等待时被打断
      */
     final boolean acquireQueued(final Node node, int arg) {
         boolean failed = true;
@@ -757,6 +754,7 @@ public abstract class AbstractQueuedSynchronizer
             for (;;) {
                 final Node p = node.predecessor();
                 if (p == head && tryAcquire(arg)) {
+                    //直接设置头节点为当前节点node
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
@@ -940,59 +938,43 @@ public abstract class AbstractQueuedSynchronizer
         }
     }
 
-    // Main exported methods
+    // 主要导出的方法
 
     /**
-     * Attempts to acquire in exclusive mode. This method should query
-     * if the state of the object permits it to be acquired in the
-     * exclusive mode, and if so to acquire it.
+     * 尝试以独占模式进行获取。
+     * 此方法应查询对象的状态state是否允许以独占模式获取对象，如果允许则获取对象。
+     *                                                                 
+     * <p>此方法始终由执行acquire的线程调用。
+     *  如果此方法报告失败，则acquire方法可将线程排队（如果尚未排队），直到该线程被其他线程的一个释放信号为止。
+     *  这可以用来实现方法{@link Lock＃tryLock（）}。
+     * <p>默认的实现抛出 {@link UnsupportedOperationException}.
      *
-     * <p>This method is always invoked by the thread performing
-     * acquire.  If this method reports failure, the acquire method
-     * may queue the thread, if it is not already queued, until it is
-     * signalled by a release from some other thread. This can be used
-     * to implement method {@link Lock#tryLock()}.
-     *
-     * <p>The default
-     * implementation throws {@link UnsupportedOperationException}.
-     *
-     * @param arg the acquire argument. This value is always the one
-     *        passed to an acquire method, or is the value saved on entry
-     *        to a condition wait.  The value is otherwise uninterpreted
-     *        and can represent anything you like.
-     * @return {@code true} if successful. Upon success, this object has
-     *         been acquired.
-     * @throws IllegalMonitorStateException if acquiring would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if exclusive mode is not supported
+     * @param  arg 获取参数。 该值始终是传递给acquire方法的值，或者是在进入条件等待时保存的值。
+     *             否则该值将无法解释，并且可以代表你喜欢的任何内容。
+     * @return {@code true} 如果成功的话就返回true。成功的话，这个对象已经被获取到了。
+     * @throws IllegalMonitorStateException 如果获取会使该同步器处于非法状态，则抛出IllegalMonitorStateException。
+     *            必须以一致的方式抛出此异常，以使同步正常工作。
+     * @throws UnsupportedOperationException 如果独占模式不支持
      */
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
 
     /**
-     * Attempts to set the state to reflect a release in exclusive
-     * mode.
+     * 在独占模式中，尝试设置状态（state）反映释放。
      *
-     * <p>This method is always invoked by the thread performing release.
      *
-     * <p>The default implementation throws
+     * <p>始终由执行释放的线程调用此方法。
+     *
+     * <p>默认的实现抛出
      * {@link UnsupportedOperationException}.
      *
-     * @param arg the release argument. This value is always the one
-     *        passed to a release method, or the current state value upon
-     *        entry to a condition wait.  The value is otherwise
-     *        uninterpreted and can represent anything you like.
-     * @return {@code true} if this object is now in a fully released
-     *         state, so that any waiting threads may attempt to acquire;
-     *         and {@code false} otherwise.
-     * @throws IllegalMonitorStateException if releasing would place this
-     *         synchronizer in an illegal state. This exception must be
-     *         thrown in a consistent fashion for synchronization to work
-     *         correctly.
-     * @throws UnsupportedOperationException if exclusive mode is not supported
+     * @param  arg release参数。该值始终是传递给release方法的值，或者是在进入条件等待时的当前状态值。
+     *            否则该值将无法解释，并且可以代表你喜欢的任何内容。
+     * @return {@code true}，如果此对象现在处于完全释放状态，则任何等待线程都可以尝试获取； 否则为{@code false}。
+     * @throws IllegalMonitorStateException 如果释放将使该同步器处于非法状态。
+     *          必须以一致的方式抛出此异常，以使同步正常工作。
+     * @throws UnsupportedOperationException 如果独占模式不支持
      */
     protected boolean tryRelease(int arg) {
         throw new UnsupportedOperationException();
@@ -1144,14 +1126,11 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * Releases in exclusive mode.  Implemented by unblocking one or
-     * more threads if {@link #tryRelease} returns true.
-     * This method can be used to implement method {@link Lock#unlock}.
+     * 以独占模式释放锁。 如果{@link #tryRelease}返回true，则通过解除阻塞一个或多个线程来实现。
+     * 此方法可用于实现方法{@link Lock＃unlock}。
      *
-     * @param arg the release argument.  This value is conveyed to
-     *        {@link #tryRelease} but is otherwise uninterpreted and
-     *        can represent anything you like.
-     * @return the value returned from {@link #tryRelease}
+     * @param arg 释放个数参数。该值将传递给{@link #tryRelease}，但否则不会被解释，并且可以表示你喜欢的任何内容。
+     * @return  {@link #tryRelease}返回的值
      */
     public final boolean release(int arg) {
         if (tryRelease(arg)) {
@@ -1516,34 +1495,35 @@ public abstract class AbstractQueuedSynchronizer
     }
 
 
-    // Internal support methods for Conditions
+    // Condition的内部支持方法
 
     /**
-     * Returns true if a node, always one that was initially placed on
-     * a condition queue, is now waiting to reacquire on sync queue.
+     * 如果某个节点（总是最初放置在条件队列中的一个节点）现在正等待在同步队列上重新获取，则返回true。
+     *
      * @param node the node
      * @return true if is reacquiring
      */
     final boolean isOnSyncQueue(Node node) {
+        //如果等待状态是条件，说明还在条件队列上，则不再同步队列上。
         if (node.waitStatus == Node.CONDITION || node.prev == null)
             return false;
+        //如果有后继节点，肯定在某个队列上，上面已经排除了条件队列，只能是同步队列了。
         if (node.next != null) // If has successor, it must be on queue
             return true;
         /*
-         * node.prev can be non-null, but not yet on queue because
-         * the CAS to place it on queue can fail. So we have to
-         * traverse from tail to make sure it actually made it.  It
-         * will always be near the tail in calls to this method, and
-         * unless the CAS failed (which is unlikely), it will be
-         * there, so we hardly ever traverse much.
+         * node.prev可以为非null，但node可能尚未在队列上，因为将node放入队列的CAS可能会失败。
+         * 因此，我们必须从尾部开始遍历以确保它确实做到了。
+         * 在此方法的调用中，它将始终靠近tail尾节点，除非CAS失败（这不太可能），
+         * 否则它将一直在CAS中，因此我们几乎不会遍历太多。
          */
         return findNodeFromTail(node);
     }
 
     /**
-     * Returns true if node is on sync queue by searching backwards from tail.
-     * Called only when needed by isOnSyncQueue.
-     * @return true if present
+     * 如果从尾节点向前搜索时，node在同步队列中，则返回true。
+     * 仅在isOnSyncQueue需要时调用。
+     *
+     * @return 存在就返回true
      */
     private boolean findNodeFromTail(Node node) {
         Node t = tail;
@@ -1560,7 +1540,7 @@ public abstract class AbstractQueuedSynchronizer
      * 将一个节点从条件队列转移到同步队列。
      * 返回true如果成功的话。
      * @param node the node
-     * @return 如果成功转移，则返回true（否则，节点在通知（signal）之前被取消）
+     * @return 如果成功转移，则返回true（否则，节点在信号（signal）之前被取消）
      */
     final boolean transferForSignal(Node node) {
         /*
@@ -1606,15 +1586,17 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * Invokes release with current state value; returns saved state.
-     * Cancels node and throws exception on failure.
-     * @param node the condition node for this wait
-     * @return previous sync state
+     * 用当前state值调用release方法； 返回保存的state。
+     * 取消节点并在失败时抛出异常。
+     * @param node 等待的条件节点
+     * @return 之前的同步状态
      */
     final int fullyRelease(Node node) {
         boolean failed = true;
         try {
+            //获取state的值
             int savedState = getState();
+            //以独占模式释放锁
             if (release(savedState)) {
                 failed = false;
                 return savedState;
@@ -1781,8 +1763,8 @@ public abstract class AbstractQueuedSynchronizer
          * 从条件队列中取消链接已取消等待节点。
          * 仅在持有锁的状态下调用。
          * 当在条件等待期间发生取消操作时，以及在看到lastWaiter被取消后插入新的waiter时，调用此方法。
-         * 需要这种方法来避免在没有通知(signal)的情况下遗留垃圾。
-         * 所以即使它可能需要完全遍历，只有在没有通知(signal)的情况下发生超时或取消时，它才起作用。
+         * 需要这种方法来避免在没有信号(signal)的情况下遗留垃圾。
+         * 所以即使它可能需要完全遍历，只有在没有信号(signal)的情况下发生超时或取消时，它才起作用。
          * 它遍历所有节点，而不是停在特定目标上，以取消所有指向垃圾节点的指针的链接，而无需在取消风暴期间进行多次遍历。
          * todo 看懂
          */
@@ -1841,17 +1823,20 @@ public abstract class AbstractQueuedSynchronizer
          * <ol>
          * <li> 保存由AbstractQueuedSynchronizer.getState()返回的锁定状态。
          * <li> 以保存的state作为参数调用AbstractQueuedSynchronizer.release（int），如果失败则抛出IllegalMonitorStateException。
-         * <li> 阻塞直到被通知为止。
+         * <li> 阻塞直到被信号为止。
          * <li> 通过将保存的state作为参数调用acquire（int）的专用版本来重新获取。
          * todo 翻译到这里
          */
         public final void awaitUninterruptibly() {
             //当前线程添加到条件等待队列。
             Node node = addConditionWaiter();
+            //释放节点
             int savedState = fullyRelease(node);
             boolean interrupted = false;
             while (!isOnSyncQueue(node)) {
+                //node不在同步队列上，就一直尝试阻塞当前线程。
                 LockSupport.park(this);
+                //如果当前线程被中断了，则记录下来
                 if (Thread.interrupted())
                     interrupted = true;
             }
@@ -1927,22 +1912,22 @@ public abstract class AbstractQueuedSynchronizer
         }
 
         /**
-         * Implements timed condition wait.
+         * 实现定时条件等待。
          * <ol>
-         * <li> If current thread is interrupted, throw InterruptedException.
-         * <li> Save lock state returned by {@link #getState}.
-         * <li> Invoke {@link #release} with saved state as argument,
-         *      throwing IllegalMonitorStateException if it fails.
-         * <li> Block until signalled, interrupted, or timed out.
-         * <li> Reacquire by invoking specialized version of
-         *      {@link #acquire} with saved state as argument.
-         * <li> If interrupted while blocked in step 4, throw InterruptedException.
+         * <li>如果当前线程被中断，则抛出InterruptedException。
+         * <li>保存{@link #getState}返回的锁定状态。
+         * <li>使用保存的state作为参数调用{@link #release}，
+         *       如果失败，则抛出IllegalMonitorStateException。
+         * <li>阻塞，直到被信号，中断或超时为止。
+         * <li>通过将保存的state作为参数, 调用{@link #acquire}专业版来重新获取    
+         * <li>如果在步骤4中阻塞中而被中断，则抛出InterruptedException。
          * </ol>
          */
         public final long awaitNanos(long nanosTimeout)
                 throws InterruptedException {
             if (Thread.interrupted())
                 throw new InterruptedException();
+            //添加到条件等待队列
             Node node = addConditionWaiter();
             int savedState = fullyRelease(node);
             final long deadline = System.nanoTime() + nanosTimeout;

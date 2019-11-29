@@ -166,7 +166,7 @@ public interface Condition {
      * 与响应一个signal的通常方法返回相比，实现类可能更倾向于响应一个中断。
      * 在那种情况下，实现类必须确保将信号重定向到另一个等待线程（如果有一个的话）。
  
-     * @throws：InterruptedException-如果当前线程被中断（并且支持线程挂起的中断）
+     * @throws InterruptedException-如果当前线程被中断（并且支持线程挂起的中断）
      */
     void awaitUninterruptibly();
  
@@ -234,7 +234,7 @@ public interface Condition {
      * @return 参数nanosTimeout值减去从此方法返回之前等待的时间的估计值。 
      *         如果返回值是一个正数的话，可以用作对该方法的后续调用的参数，以完成等待所需的时间。 
      *         如果返回值是一个小于或等于零的值，则表示没有时间剩余。
-     * @throws：InterruptedException-如果当前线程被中断（并且支持线程挂起的中断）
+     * @throws InterruptedException 如果当前线程被中断（并且支持线程挂起的中断）
      */
     long awaitNanos(long nanosTimeout) throws InterruptedException;
  
