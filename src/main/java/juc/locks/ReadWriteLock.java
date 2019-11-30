@@ -1,43 +1,6 @@
-/*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
-
 package juc.locks;
 
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * A {@code ReadWriteLock} maintains a pair of associated {@link
@@ -126,12 +89,12 @@ public interface ReadWriteLock {
      *
      * @return the lock used for reading
      */
-    Lock readLock();
+    juc.locks.Lock readLock();
 
     /**
      * Returns the lock used for writing.
      *
      * @return the lock used for writing
      */
-    Lock writeLock();
+    juc.locks.Lock writeLock();
 }

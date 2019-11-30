@@ -1,45 +1,6 @@
-/*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
-
 package juc.locks;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.LockSupport;
 
 /**
  * A capability-based lock with three modes for controlling read/write
@@ -1389,7 +1350,7 @@ public class StampedLock implements java.io.Serializable {
     static {
         try {
             U = sun.misc.Unsafe.getUnsafe();
-            Class<?> k = java.util.concurrent.locks.StampedLock.class;
+            Class<?> k = StampedLock.class;
             Class<?> wk = WNode.class;
             STATE = U.objectFieldOffset
                 (k.getDeclaredField("state"));
