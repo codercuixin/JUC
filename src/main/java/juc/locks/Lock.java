@@ -9,8 +9,7 @@ import java.util.concurrent.TimeUnit;
  *  通常，锁提供对共享资源的独占访问：一次只能有一个线程可以获取该锁，而对共享资源的所有访问都需要首先获取该锁。
  *  但是，某些锁可能允许并发访问共享资源，例如{@link ReadWriteLock}的读取锁。
  *
- * <p>使用{@code synchronized}方法或语句可访问与每个对象关联的隐式monitor锁，
- *  但会强制所有锁的获取和释放以块结构的方式发生：
+ * <p>使用{@code synchronized}方法或语句可访问与每个对象关联的隐式monitor锁，但会强制所有锁的获取和释放以块结构的方式发生:
  *  当获取多个锁时，它们必须以相反的顺序释放，并且所有锁必须在与获得这些锁的相同词法作用域内释放。
  *
  *  <p> 尽管用于{@code synchronized}方法和语句的作用域机制让使用monitor锁的编程变得更加容易，
@@ -87,7 +86,7 @@ public interface Lock {
     void lock();
 
     /**
-     * 除非当前线程中断{@linkplain Thread#interrupt()}，否则获取锁。
+     * 除非当前线程被中断{@linkplain Thread#interrupt()}，否则获取锁。
      *
      * <p>如果锁可用，则获取锁并立即返回。
      * <p>如果锁不可用，那么当前线程将出于线程调度的目的被禁用，并处于休眠状态，直到发生以下两种情况之一:

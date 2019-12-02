@@ -34,9 +34,10 @@
  */
 
 package juc;
+import juc.locks.AbstractQueuedSynchronizer;
+
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
 /**
  * 一种同步帮助，它允许一个或多个线程等待，直到在其他线程中执行的一组操作完成为止。

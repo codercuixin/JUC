@@ -34,10 +34,10 @@
  */
 
 package juc;
+import juc.locks.AbstractQueuedSynchronizer;
+
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
-
 /**
  * A counting semaphore.  Conceptually, a semaphore maintains a set of
  * permits.  Each {@link #acquire} blocks if necessary until a permit is

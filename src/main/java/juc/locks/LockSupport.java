@@ -1,5 +1,7 @@
 package juc.locks;
 
+import unsafeTest.GetUnsafeFromReflect;
+
 /**
  * 创建锁和其他同步类的基本线程阻塞原语。
  *
@@ -70,7 +72,7 @@ public class LockSupport {
 
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = GetUnsafeFromReflect.getUnsafe();
             Class<?> tk = Thread.class;
             parkBlockerOffset = UNSAFE.objectFieldOffset
                     (tk.getDeclaredField("parkBlocker"));
@@ -104,6 +106,7 @@ public class LockSupport {
      */
     public static void unpark(Thread thread) {
         if (thread != null)
+            //取消阻塞由于调用park方法阻塞的给定线程，或者，如果线程未阻塞，则导致随后的调用park不阻塞。
             UNSAFE.unpark(thread);
     }
 
@@ -126,8 +129,12 @@ public class LockSupport {
      */
     public static void park(Object blocker) {
         Thread t = Thread.currentThread();
+        //设置当前线程t的blocker为参数blocker
         setBlocker(t, blocker);
+        //阻塞当前线程，在发生与之平衡的unpark或已经发生与之平衡的unpark，或线程被中断，或设置的时间过了
+        // (设置的时间过了包括以下几种：或如果不是绝对时间且时间不为零，且给定时间的纳秒数已经过了，或如果是绝对时间，从Epoch开始的截止时间已经过去）。
         UNSAFE.park(false, 0L);
+        //设置当前线程t的blocker为null
         setBlocker(t, null);
     }
 
