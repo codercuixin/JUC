@@ -345,32 +345,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
 
     /**
      *
-     * <ul>
-     *
-     * <li>If this lock is not held when any of the {@link Condition}
-     * {@linkplain Condition#await() waiting} or {@linkplain
-     * Condition#signal signalling} methods are called, then an {@link
-     * IllegalMonitorStateException} is thrown.
-     *
-     * <li>When the condition {@linkplain Condition#await() waiting}
-     * methods are called the lock is released and, before they
-     * return, the lock is reacquired and the lock hold count restored
-     * to what it was when the method was called.
-     *
-     * <li>If a thread is {@linkplain Thread#interrupt interrupted}
-     * while waiting then the wait will terminate, an {@link
-     * InterruptedException} will be thrown, and the thread's
-     * interrupted status will be cleared.
-     *
-     * <li> Waiting threads are signalled in FIFO order.
-     *
-     * <li>The ordering of lock reacquisition for threads returning
-     * from waiting methods is the same as for threads initially
-     * acquiring the lock, which is in the default case not specified,
-     * but for <em>fair</em> locks favors those threads that have been
-     * waiting the longest.
-     *
-     * </ul>
      * 返回与此Lock实例一起使用的Condition实例。
      *
      * <p>当与内置monitor锁一起使用时，返回的Condition实例支持与Object监视器方法（wait，notify和notifyAll）相同的用法。
