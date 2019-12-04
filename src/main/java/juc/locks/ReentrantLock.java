@@ -1,9 +1,7 @@
 package juc.locks;
 import java.util.concurrent.TimeUnit;
 import java.util.Collection;
-import java.util.concurrent.locks.AbstractQueuedSynchronizer;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
+
 
 /**
  * 可重入互斥{@link Lock}具有与使用{@code synchronized}方法和语句访问的隐式monitor锁相同的基本行为和语义，
@@ -37,19 +35,6 @@ import java.util.concurrent.locks.Lock;
  *     }
  *   }
  * }}</pre>
- *
- * <p>In addition to implementing the {@link Lock} interface, this
- * class defines a number of {@code public} and {@code protected}
- * methods for inspecting the state of the lock.  Some of these
- * methods are only useful for instrumentation and monitoring.
- *
- * <p>Serialization of this class behaves in the same way as built-in
- * locks: a deserialized lock is in the unlocked state, regardless of
- * its state when serialized.
- *
- * <p>This lock supports a maximum of 2147483647 recursive locks by
- * the same thread. Attempts to exceed this limit result in
- * {@link Error} throws from locking methods.
  *
  * <p>除了实现{@link Lock}接口外，该类还定义了许多{@code public}和{@code protected}方法来检查锁的状态。
  * 其中一些方法仅对检测和监视有用。
@@ -109,6 +94,10 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             return false;
         }
 
+        /**
+         * 在独占模式中，尝试设置状态（state）反映释放。
+         * 用存的state值减去releases。如果剩余值变为0，设置独占线程为null，返回true，也就是独占锁被释放了；否则返回false，也就是独占锁没有被释放。
+         */
         protected final boolean tryRelease(int releases) {
             int c = getState() - releases;
             //只有独占线程才可以调用这个方法，如果不是则抛出IllegalMonitorStateException异常。
@@ -297,17 +286,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     }
 
     /**
-     * Acquires the lock if it is not held by another thread within the given
-     * waiting time and the current thread has not been
-     * {@linkplain Thread#interrupt interrupted}.
-     *
-     * <p>Acquires the lock if it is not held by another thread and returns
-     * immediately with the value {@code true}, setting the lock hold count
-     * to one. If this lock has been set to use a fair ordering policy then
-     * an available lock <em>will not</em> be acquired if any other threads
-     * are waiting for the lock. This is in contrast to the {@link #tryLock()}
-     * method. If you want a timed {@code tryLock} that does permit barging on
-     * a fair lock then combine the timed and un-timed forms together:
      * 如果在给定的等待时间内锁没有被另一个线程持有，并且当前线程没有被中断{@linkplain Thread#interrupt}，则获取锁。
      *
      * 获得锁，如果它没有被另一个线程持有，并立即返回值{@code true}，设置锁持有计数为1。

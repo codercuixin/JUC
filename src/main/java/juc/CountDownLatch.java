@@ -1,38 +1,3 @@
-/*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
-
 package juc;
 import juc.locks.AbstractQueuedSynchronizer;
 
@@ -151,18 +116,45 @@ public class CountDownLatch {
             return getState();
         }
 
+        /**
+         * (下面的方法注释来自父类AQS）。
+         * 尝试以共享模式获取。该方法应该查询对象的状态是否允许在共享模式下获取它，如果允许，则应该获取它。
+         *
+         * <p>此方法总是由执行获取的线程调用。如果此方法报告失败，则获取方法可能会对线程进行排队(如果它还没有排队)，
+         * 直到通过其他线程的发出释放信号。
+         *
+         * @param acquires 获取参数。这个值总是被传递给一个获取方法，或者是在进入一个条件wait时被保存。该值是未解释的，可以表示你喜欢的任何内容。
+         * @return 返回负值表示失败;
+         *         返回0表示，这次共享模式下的获取成功，但是后续的共享模式获取都不会成功;
+         *         返回正数表示，这次共享模式下获取成功，并且随后的共享模式获取也可能成功，那么在这种情况下，后续的等待线程必须检查可用性。
+         *         (支持三种不同的返回值，使此方法可以用于仅在某些情况下才进行获取的上下文中。)
+         *         成功之后，这个对象就获得了。
+         * @throws IllegalMonitorStateException  如果获取将使该同步器处于非法状态。必须以一致的方式抛出此异常，以便同步工作正常。
+         */
         protected int tryAcquireShared(int acquires) {
             return (getState() == 0) ? 1 : -1;
         }
 
+        /**
+         *  (下面的方法注释来自父类AQS）。
+         * 尝试设置状态来反映共享模式下的释放。
+         *
+         * <p>这个方法总是被执行release的线程调用。
+         * @param releases 获取参数。这个值总是被传递给一个获取方法，或者是在进入一个条件wait时被保存。该值是未解释的，可以表示你喜欢的任何内容。
+         * @return 如果共享模式下的释放可以允许（共享的或独占的）等待的获取成功，就返回true，否则返回false。
+         * @throws IllegalMonitorStateException  如果获取将使该同步器处于非法状态。必须以一致的方式抛出此异常，以便同步工作正常。
+         */
         protected boolean tryReleaseShared(int releases) {
-            // 递减计数； 过渡到零时发出信号
+            // 递减计数； 过渡到零时发出信号(也就是第一次减少到0时，本方法才返回true，其他情况都返回false)
             for (;;) {
                 int c = getState();
+                //如果已经等于0了，就直接返回false。
                 if (c == 0)
                     return false;
                 int nextc = c-1;
+                //尝试CAS将satate的值减1.
                 if (compareAndSetState(c, nextc))
+                    //如果CAS成功的话就返回 nextc==0,也就是nextc为0，返回true；否则，返回false。
                     return nextc == 0;
             }
         }
@@ -182,28 +174,6 @@ public class CountDownLatch {
     }
 
     /**
-     * Causes the current thread to wait until the latch has counted down to
-     * zero, unless the thread is {@linkplain Thread#interrupt interrupted}.
-     *
-     * <p>If the current count is zero then this method returns immediately.
-     *
-     * <p>If the current count is greater than zero then the current
-     * thread becomes disabled for thread scheduling purposes and lies
-     * dormant until one of two things happen:
-     * <ul>
-     * <li>The count reaches zero due to invocations of the
-     * {@link #countDown} method; or
-     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
-     * the current thread.
-     * </ul>
-     *
-     * <p>If the current thread:
-     * <ul>
-     * <li>has its interrupted status set on entry to this method; or
-     * <li>is {@linkplain Thread#interrupt interrupted} while waiting,
-     * </ul>
-     * then {@link InterruptedException} is thrown and the current thread's
-     * interrupted status is cleared.
      * 使当前线程等待，直到锁存器递减至零为止，除非该线程被中断{@linkplain Thread#interrupt} 。
      *
      * <p>如果当前计数为零，则此方法立即返回。

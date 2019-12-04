@@ -1,6 +1,7 @@
 package juc.locks;
 
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -216,7 +217,7 @@ public abstract class AbstractQueuedSynchronizer
      * 因此，作为缺点中的优点，我们使用hotspot intrinsics API在本地实现它。
      * 同时，我们还对其他CASable字段执行相同的操作(可以通过原子字段更新器执行)。
      */
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
     private static final long stateOffset;
     private static final long headOffset;
     private static final long tailOffset;
@@ -282,7 +283,7 @@ public abstract class AbstractQueuedSynchronizer
              * 该节点已经设置了状态，要求一个释放以发出信号，以便可以安全地停放。
              */
             return true;
-        //节点状态大于0，只能是CANCELLED, 就重新设置node的前继节点（跳过那些CANCELLED节点）
+        //如果前继节点状态大于0(也就是CANCELLED), 就重新设置node的前继节点（跳过那些CANCELLED节点）
         if (ws > 0) {
             /*
              * 前继节点被取消了。
@@ -293,6 +294,7 @@ public abstract class AbstractQueuedSynchronizer
             } while (pred.waitStatus > 0);
             pred.next = node;
         } else {
+            //前继节点的状态为其他值（<=0, 但排除Node.SIGNAL）
             /*
              * waitStatus必须为0或PROPAGATE。
              * 表示我们需要一个信号，但不要park。
@@ -304,7 +306,7 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * Convenience method to interrupt current thread.
+     * 中断当前线程
      */
     static void selfInterrupt() {
         Thread.currentThread().interrupt();
@@ -414,6 +416,7 @@ public abstract class AbstractQueuedSynchronizer
                 return node;
             }
         }
+        //完整的入队操作
         enq(node);
         return node;
     }
@@ -463,63 +466,61 @@ public abstract class AbstractQueuedSynchronizer
             LockSupport.unpark(s.thread);
     }
 
+
     /**
-     * 共享模式下的释放动作——通知后继者，并确保广播。
+     * 共享模式下的释放动作——通知后继者，并确保传播。
      * (注意:对于独占模式，如果需要通知头结点，释放仅相当于对头结点head调用unparkSuccessor。)
      */
     private void doReleaseShared() {
         /*
-         * 确保一个release传播，即使有其他正在进行的acquires/releases.
-         * 这是按照通常的方式进行的，如果它需要信号的话，就会试图唤醒head的后继节点。
-         * 但如果没有，则将状态设置为PROPAGATE，以确保在release后传播仍将继续。
-         * 此外，我们必须循环，以防在执行此操作时添加新节点。
-         * 另外，与unparkSuccessor的其他用途不同，我们需要知道CAS重置status是否失败，如果是的话需要重新检查。
+         * 无限循环：
+         *  如果头节点快照不为空，且不为尾节点。
+         *      如果头节点快照h的等待状态是SIGNAL，则一直CAS设置，直到某个线程将节点状态为0，并唤醒后继节点(unparkSuccessor)。
+         *      如果头节点快照h的等待状态是0，则一直CAS设置，直到某个线程将节点状态为PROPAGATE
+         *  如果经过上面的条件判断及相关逻辑，头节点快照等于头节点内存实时值，就跳出循环。
          */
         for (; ; ) {
             Node h = head;
             if (h != null && h != tail) {
                 int ws = h.waitStatus;
+                //如果头节点状态为SIGNAL，就会就会试图唤醒head的后继节点（利用unparkSuccessor）
                 if (ws == Node.SIGNAL) {
+                    //cas更新节点等待状态，如果实际值等于期望值SIGANL，则更新为0。
+                    //如果CAS成功，则执行unparkSuccessor，如果CAS失败，就重新循环。
                     if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
-                        continue;            // 循环重新检查的例子
+                        continue;            // 如果上面CAS失败的话，会重新循环以重试。
+                    //唤醒后继节点。
                     unparkSuccessor(h);
-                } else if (ws == 0 &&
+                }
+                // 如果头节点状态为0，则将状态设置为PROPAGATE，以确保在release后传播仍将继续。
+                else if (ws == 0 &&
                         !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
-                    continue;                // loop on failed CAS
+                    continue;                // 如果上面CAS失败的话，会重新循环以重试。
             }
-            if (h == head)                   // 如果头结点发生改变了就跳出循环，此时表明上面的CAS成功
+            if (h == head)                   // 如果头结点状态稳定了，就跳出循环。
                 break;
         }
     }
 
+
     /**
-     * 设置队列的头节点head，并检查后继节点是否在共享模式下等待，如果是，同时或者propagate参数>0或者节点node状态被设置成PROPAGATE，则继续传播
-     * Sets head of queue, and checks if successor may be waiting
-     * in shared mode, if so propagating if either propagate > 0 or
-     * PROPAGATE status was set.
+     * 设置队列的头节点head，先检查是否propagate参数>0或者节点node状态被设置成PROPAGATE，如果检查为true，并检查next是否在共享模式，如果是则继续传播（执行doReleaseShared）
      *
      * @param node      the node
-     * @param propagate the return value from a tryAcquireShared
+     * @param propagate 调用tryAcquireShared的返回值
      */
     private void setHeadAndPropagate(Node node, int propagate) {
-        Node h = head; // Record old head for check below
+        //为了下面的检查记录老的头节点
+        Node h = head;
+        //设置当前node为新的头节点。
         setHead(node);
         /*
-         * todo translate
-         * Try to signal next queued node if:
-         *   Propagation was indicated by caller,
-         *     or was recorded (as h.waitStatus either before
-         *     or after setHead) by a previous operation
-         *     (note: this uses sign-check of waitStatus because
-         *      PROPAGATE status may transition to SIGNAL.)
-         * and
-         *   The next node is waiting in shared mode,
-         *     or we don't know, because it appears null
-         *
-         * The conservatism in both of these checks may cause
-         * unnecessary wake-ups, but only when there are multiple
-         * racing acquires/releases, so most need signals now or soon
-         * anyway.
+         * 尝试去通知下一个排队的节点，如果：
+         *    参数propagate大于0，或者对老的头节点和新的头节点进行判断，即 h == null || h.waitStatus < 0 || (h = head) == null || h.waitStatus < 0部分，这里使用
+         *    符号判断的原因是因为节点的waitStatus(等待状态)可能会从PROPAGATE转移到SIGNAL
+         * 然后就执行if里面的逻辑，
+         *    如果当前节点node的next节点为null或这他是共享模式的，则执行doReleaseShared
+         * 这两项检查中的保守性可能会导致不必要的唤醒，但只有在有多个线程竞争获取/发布时，因此无论现在还是不久，大多数线程还是需要通知。
          */
         if (propagate > 0 || h == null || h.waitStatus < 0 ||
                 (h = head) == null || h.waitStatus < 0) {
@@ -618,7 +619,7 @@ public abstract class AbstractQueuedSynchronizer
             boolean interrupted = false;
             for (; ; ) {
                 final Node p = node.predecessor();
-                //如果当期节点的前继节点为head，则尝试获取许可
+                //如果当期节点的前继节点为head，则尝试以独占模式进行获取。
                 if (p == head && tryAcquire(arg)) {
                     //成功获取许可，直接设置头节点为当前节点node
                     setHead(node);
@@ -626,7 +627,8 @@ public abstract class AbstractQueuedSynchronizer
                     failed = false;
                     return interrupted;
                 }
-                //判断是否需要使当前节点线程休眠park， 如果需要的话就休眠当前线程，并检查线程是否被中断，如果是则设置interrupted为true。
+                //shouldParkAfterFailedAcquire(p, node)判断是否需要使当前节点线程休眠park.
+                //parkAndCheckInterrupt 如果需要的话就休眠当前线程，并检查线程是否被中断，如果是则设置interrupted为true。
                 if (shouldParkAfterFailedAcquire(p, node) &&
                         parkAndCheckInterrupt())
                     interrupted = true;
@@ -666,7 +668,7 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * 以独占地定时的模式来获取。
+     * 以独占地定时的模式来获取。(尝试在指定的时间获取独占锁）
      *
      * @param arg          the acquire argument
      * @param nanosTimeout max wait time
@@ -677,20 +679,27 @@ public abstract class AbstractQueuedSynchronizer
         if (nanosTimeout <= 0L)
             return false;
         final long deadline = System.nanoTime() + nanosTimeout;
+        //以独占模式将节点添加到同步队列尾部
         final Node node = addWaiter(Node.EXCLUSIVE);
         boolean failed = true;
         try {
             for (; ; ) {
                 final Node p = node.predecessor();
+                //如果当前节点的前继节点是头节点，就尝试调用tryAcquire获取独占锁。
                 if (p == head && tryAcquire(arg)) {
+                    //获取独占锁成功，就设置新的头节点为当前节点node
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return true;
                 }
+                //如果上面if条件没有成功，则计算剩余的等待时间。
                 nanosTimeout = deadline - System.nanoTime();
+                //如果等待时间<=0， 即超时了，就直接返回了。
                 if (nanosTimeout <= 0L)
                     return false;
+                //shouldParkAfterFailedAcquire判断获取锁失败之后是否需要使当前节点线程休眠park.
+                //如果shouldParkAfterFailedAcquire返回true，并且当前超时时间剩余大于spinForTimeoutThreshold，则使得当前线程阻塞nanosTimeout纳秒。
                 if (shouldParkAfterFailedAcquire(p, node) &&
                         nanosTimeout > spinForTimeoutThreshold)
                     LockSupport.parkNanos(this, nanosTimeout);
@@ -743,20 +752,27 @@ public abstract class AbstractQueuedSynchronizer
      */
     private void doAcquireSharedInterruptibly(int arg)
             throws InterruptedException {
+        //以共享模式添加当前节点到同步队列的尾部。
         final Node node = addWaiter(Node.SHARED);
         boolean failed = true;
         try {
             for (; ; ) {
                 final Node p = node.predecessor();
+                //如果前继节点是头节点
                 if (p == head) {
+                    //尝试获取共享锁
                     int r = tryAcquireShared(arg);
+                    //如果返回值>=0, 根据tryAcquireShared方法规范可知，此时已经获取到了共享锁。
                     if (r >= 0) {
+                        //设置头节点并传播
                         setHeadAndPropagate(node, r);
                         p.next = null; // help GC
                         failed = false;
                         return;
                     }
                 }
+                //shouldParkAfterFailedAcquire(p, node)判断是否需要使当前节点线程休眠park.
+                //parkAndCheckInterrupt 如果需要的话就休眠当前线程，并检查线程是否被中断，如果是则设置interrupted为true。
                 if (shouldParkAfterFailedAcquire(p, node) &&
                         parkAndCheckInterrupt())
                     throw new InterruptedException();
@@ -932,7 +948,7 @@ public abstract class AbstractQueuedSynchronizer
     }
 
     /**
-     * 尝试以独占模式获取，如果中断将中止，如果给定超时了将失败。
+     * 尝试以独占模式获取，如果中断将中止，如果超时了将失败。
      *
      * 首先检查中断状态，然后至少调用一次{@link #tryAcquire}，成功后返回。
      * 否则，线程将排队，可能会重复阻塞和取消阻塞，调用{@link #tryAcquire}，直到成功或线程中断或超时结束。
@@ -991,6 +1007,7 @@ public abstract class AbstractQueuedSynchronizer
             throws InterruptedException {
         if (Thread.interrupted())
             throw new InterruptedException();
+        //尝试获取共享锁，如果获取失败，会返回负数，然后会执行if里面的doAcquireSharedInterruptibly逻辑；如果获取成功，返回值就是大于等于0的数，就直接返回了。
         if (tryAcquireShared(arg) < 0)
             doAcquireSharedInterruptibly(arg);
     }
