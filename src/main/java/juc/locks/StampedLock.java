@@ -11,39 +11,29 @@ import java.util.concurrent.TimeUnit;
  * represent failure to acquire access. Lock release and conversion
  * methods require stamps as arguments, and fail if they do not match
  * the state of the lock. The three modes are:
- *
+ * 一种基于功能的锁，具有三种模式来控制读/写访问。
+ * StampedLock的状态由版本和模式组成。
+ * 锁获取方法返回一个戳记(stamp)，该戳记表示并控制相对于锁状态的访问；
+ * 这些方法的“try”版本可能会返回特殊值零，以表示无法获取访问权限。
+ * 锁释放和转换方法需要使用戳记(stamp)作为参数，如果它们与锁的状态不匹配，则会失败。
+ * 三种模式是：
  * <ul>
  *
- *  <li><b>Writing.</b> Method {@link #writeLock} possibly blocks
- *   waiting for exclusive access, returning a stamp that can be used
- *   in method {@link #unlockWrite} to release the lock. Untimed and
- *   timed versions of {@code tryWriteLock} are also provided. When
- *   the lock is held in write mode, no read locks may be obtained,
- *   and all optimistic read validations will fail.  </li>
+ *  <li><b>写.</b> 方法{@link #writeLock}可能会阻止等待的独占访问，返回可以在方法{@link #unlockWrite(long)}中使用的戳记(stamp)以释放锁。
+ *  还提供了{@link #tryWriteLock}</li>                                                                                            ｝的非定时版本和定时版本。当锁保持在写模式时，可能不会获得任何读锁，并且所有乐观读验证都将失败。
  *
- *  <li><b>Reading.</b> Method {@link #readLock} possibly blocks
- *   waiting for non-exclusive access, returning a stamp that can be
- *   used in method {@link #unlockRead} to release the lock. Untimed
- *   and timed versions of {@code tryReadLock} are also provided. </li>
+ *  <li><b>读.</b>方法 {@link #readLock}可能会阻止等待的非独占访问，返回可以在方法{@link #unlockRead(long)｝中使用的戳记以释放锁。
+ *   还提供了{@link #tryReadLock}的非定时版本和定时版本。</li>
  *
- *  <li><b>Optimistic Reading.</b> Method {@link #tryOptimisticRead}
- *   returns a non-zero stamp only if the lock is not currently held
- *   in write mode. Method {@link #validate} returns true if the lock
- *   has not been acquired in write mode since obtaining a given
- *   stamp.  This mode can be thought of as an extremely weak version
- *   of a read-lock, that can be broken by a writer at any time.  The
- *   use of optimistic mode for short read-only code segments often
- *   reduces contention and improves throughput.  However, its use is
- *   inherently fragile.  Optimistic read sections should only read
- *   fields and hold them in local variables for later use after
- *   validation. Fields read while in optimistic mode may be wildly
- *   inconsistent, so usage applies only when you are familiar enough
- *   with data representations to check consistency and/or repeatedly
- *   invoke method {@code validate()}.  For example, such steps are
- *   typically required when first reading an object or array
- *   reference, and then accessing one of its fields, elements or
- *   methods. </li>
- *
+ *  <li><b>乐观读.</b> </li>
+ *  乐观读。仅当锁当前未处于写模式时，方法{@link #tryOptimisticRead()}才返回非零戳记(stamp)。
+ *  如果自获取给定戳记以来没有在写模式下获取锁，则{@link #validate(long)}方法将返回true。
+ *  可以将此模式视为读锁的极弱版本，写线程可以随时将其破坏。
+ *  对较短的只读代码段使用乐观模式通常可以减少争用并提高吞吐量。
+ *  但是，乐观锁的使用是天然地易碎的。
+ *  乐观的读取部分代码应仅读取字段并将其保存在局部变量中，以供验证后使用。
+ *  在乐观模式下读取的字段可能完全不一致，因此用法仅在你足够熟悉数据表示以检查一致性和/或重复调用方法validate（）时适用。
+ *   例如，当首先读取对象或数组引用，然后访问其字段，元素或方法之一时，通常需要执行这些步骤 </li>
  * </ul>
  *
  * <p>This class also supports methods that conditionally provide
@@ -54,44 +44,30 @@ import java.util.concurrent.TimeUnit;
  * the lock is available. The forms of these methods are designed to
  * help reduce some of the code bloat that otherwise occurs in
  * retry-based designs.
+ * 此类还支持有条件地在三种模式之间提供转换的方法。
+ * 例如，方法{@link #tryConvertToWriteLock(long)}尝试“升级”模式，
+ * 如果（1）已经处于写模式（2）处于读模式并且没有其他读线程，或者（3）处于乐观模式，则返回有效的写戳记 并且锁是可用的。
+ * 这些方法的形式旨在帮助减少在基于重试的设计中原本会发生的某些代码膨胀。
  *
- * <p>StampedLocks are designed for use as internal utilities in the
- * development of thread-safe components. Their use relies on
- * knowledge of the internal properties of the data, objects, and
- * methods they are protecting.  They are not reentrant, so locked
- * bodies should not call other unknown methods that may try to
- * re-acquire locks (although you may pass a stamp to other methods
- * that can use or convert it).  The use of read lock modes relies on
- * the associated code sections being side-effect-free.  Unvalidated
- * optimistic read sections cannot call methods that are not known to
- * tolerate potential inconsistencies.  Stamps use finite
- * representations, and are not cryptographically secure (i.e., a
- * valid stamp may be guessable). Stamp values may recycle after (no
- * sooner than) one year of continuous operation. A stamp held without
- * use or validation for longer than this period may fail to validate
- * correctly.  StampedLocks are serializable, but always deserialize
- * into initial unlocked state, so they are not useful for remote
- * locking.
+ * <p>StampedLocks被设计为在开发线程安全组件时用作内部实用程序。
+ * 它们的使用取决于对它们所保护的数据，对象和方法的内部属性的了解。
+ * 它们不是可重入的，因此锁定的主体不应调用可能尝试重新获取锁的其他未知方法（尽管你可以将戳记传递给可以使用或转换该戳记的其他方法）。
+ * 读锁模式的使用依赖于相关的代码段无副作用。
+ * 未经验证的乐观读代码段无法调用未知的方法来容忍潜在的不一致。
+ * 戳记使用有限表示，并且不是加密安全的（即有效的戳记可能是可猜测的）。
+ * 戳记值可能会在（不超过）连续运行一年后回收重新使用。
+ * 未经使用或验证持有超过该期限的戳记可能无法正确验证。
+ * StampedLocks是可序列化的，但始终反序列化为初始解锁状态，因此它们对于远程锁定没有用。
  *
- * <p>The scheduling policy of StampedLock does not consistently
- * prefer readers over writers or vice versa.  All "try" methods are
- * best-effort and do not necessarily conform to any scheduling or
- * fairness policy. A zero return from any "try" method for acquiring
- * or converting locks does not carry any information about the state
- * of the lock; a subsequent invocation may succeed.
+ * <p>StampedLock的调度策略并不总是喜欢读线程而不是写线程，反之亦然。
+ * 所有“try”方法都是尽力而为，不一定符合任何调度或公平性策略。
+ * 任何用于获取或转换锁的“try”方法的零返回值都不会携带有关锁状态的任何信息；随后的调用可能会成功。
  *
- * <p>Because it supports coordinated usage across multiple lock
- * modes, this class does not directly implement the {@link Lock} or
- * {@link ReadWriteLock} interfaces. However, a StampedLock may be
- * viewed {@link #asReadLock()}, {@link #asWriteLock()}, or {@link
- * #asReadWriteLock()} in applications requiring only the associated
- * set of functionality.
+ * <p>因为它支持跨多种锁模式的协调使用，所以此类不直接实现{@link Lock}或{@link ReadWriteLock}接口。
+ * 但是，在仅需要相关功能集的应用程序中，StampedLock可以被视为 {@link #asReadLock()}，{@link #asWriteLock()}或{@link #asReadWriteLock()}。
  *
- * <p><b>Sample Usage.</b> The following illustrates some usage idioms
- * in a class that maintains simple two-dimensional points. The sample
- * code illustrates some try/catch conventions even though they are
- * not strictly needed here because no exceptions can occur in their
- * bodies.<br>
+ * <p><b>示例用法</b> 下面在一个维护简单二维点的类中说明了一些用法惯用法。
+ * 该示例代码说明了一些try/catch约定，尽管这里并不一定要严格遵守它们，因为它们的主体中不会出现异常。
  *
  *  <pre>{@code
  * class Point {

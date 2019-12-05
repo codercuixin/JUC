@@ -50,7 +50,6 @@ public class Main {
                 }
             }
         };
-
         Thread t1 = new Thread(modifyRunnable);
         Thread t2 = new Thread(getRunnable);
         t1.start();
