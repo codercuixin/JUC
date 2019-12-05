@@ -1143,8 +1143,8 @@ public abstract class AbstractQueuedSynchronizer
 
     /**
      * 如果第一个排队的线程(如果存在)明显正在排它模式中等待，则返回{@code true}。
-     * 如果这个方法返回{@code true}，并且当前线程正在尝试以共享模式获取(也就是说，这个方法是从{@link #tryAcquireShared}调用的)，
-     * 那么可以保证当前线程不是第一个排队的线程。这个方法只能作为ReentrantReadWriteLock中的一个启发使用。
+     * 如果这个方法返回{@code true}，并且当前线程正在尝试以共享模式获取(也就是说，这个方法是从{@link #tryAcquireShared}调用的)，那么可以保证当前线程不是第一个排队的线程。
+     * 这个方法只能作为ReentrantReadWriteLock中的一个启发使用。
      */
     final boolean apparentlyFirstQueuedIsExclusive() {
         Node h, s;

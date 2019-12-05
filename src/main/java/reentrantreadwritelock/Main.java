@@ -25,6 +25,7 @@ public class Main {
         t2.start();
     }
     public static void testRWDictionary(){
+        final String key = "Hello";
         final RWDictionary rwDictionary = new RWDictionary();
         Runnable modifyRunnable = new Runnable() {
             @Override
@@ -32,7 +33,7 @@ public class Main {
                 for(int i = 0; i< 10; i++){
                     Data d = new Data();
                     d.f = "world"+i;
-                    rwDictionary.put("Hello", d);
+                    rwDictionary.put(key, d);
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -45,7 +46,7 @@ public class Main {
             @Override
             public void run() {
                 while (true){
-                    System.out.println(rwDictionary.get("Hello") == null ? "": rwDictionary.get("Hello").f);
+                    System.out.println(rwDictionary.get(key) == null ? "": rwDictionary.get(key).f);
                 }
             }
         };
