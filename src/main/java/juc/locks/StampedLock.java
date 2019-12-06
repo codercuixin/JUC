@@ -121,7 +121,8 @@ import java.util.concurrent.TimeUnit;
  *     }
  *   }
  * }}</pre>
- *
+ *  todo 看论文
+ *  todo 位操作
  * @since 1.8
  * @author Doug Lea
  */
@@ -201,58 +202,96 @@ public class StampedLock implements java.io.Serializable {
      * adaptive-spin CLH locks to reduce memory contention lessens
      * motivation to further spread out contended locations, but might
      * be subject to future improvements.
+     *
+     *
+     */
+    /**
+     * 算法注释：
+     *
+     * 该设计采用了序列锁的元素（在Linux内核中使用；请参见Lameter的http://www.lameter.com/gelato2005.pdf和其他地方；请参见
+     * Boehm的http://www.hpl.hp.com/techreports/2012/HPL-2012-68.html）和有序的RW锁（请参见Shirako等人
+     * http://dl.acm.org/citation.cfm?id=2312015）
+     *
+     * 从概念上讲，锁的主要状态包括一个序列号，该序列号在写锁定时是奇数，在其他情况下是偶數。
+     * 但是，当读锁定时，读线程计数非0时，state是偏移量。验证"optimisitic" seqlock-reader样式戳记时，将忽略读计数。
+     * 因为我们必须为读线程们使用少量的有限位数（当前为7），所以当读线程的数量超过count字段时，将使用补充的读线程溢出字。
+     * 为此，我们将最大读线程计数值（RBITS）视为保护溢出更新的自旋锁。
+     *
+     * 等待线程们使用AbstractQueuedSynchronizer使用的CLH锁的修改形式（有关完整的描述，请参阅AQS内部文档），其中每个节点都被标记（字段模式）为读线程或写线程。
+     * 等待读线程集合被分组（链接）在一个公共节点（field cowait）下，因此相对于大多数CLH机制而言，这一组等待读线程集合充当单个节点。
+     * 由于队列结构的原因，等待节点们实际上不需要携带序列号；我们知道每一个等待节点的序列号都比其前继节点更大。
+     * 这将调度策略简化为主要是FIFO方案，包含了相位公平（Phase-Fair）锁定的元素（请参见Brandenburg＆Anderson，尤其是http://www.cs.unc.edu/~bbb/diss/）。
+     * 特别地，我们使用相公平(phase-fair)的反插入规则：如果在读锁被持有的同时刚来的读线程到达，但是有排队的写线程，则该刚来的读线程处于排队状态。
+     * （此规则是造成方法AcquireRead的某些复杂性的原因，但是如果没有它，锁将变得非常不公平。）
+     * 释放方法 不会（有时不能）自己唤醒cowaiters。这是由主线程完成的，但是得到了其他任何线程的帮助，由于在方法acquireRead和acquireWrite中没有更好的事情要做。
+     *
+     * 这些规则适用于实际排队的线程。所有tryLock形式都会尝试获取锁，而不管首选项规则，因此可能会将自己“插入”（尝试直接获取到锁）。
+     * 随机旋转在获取方法被使用来减少（越来越昂贵）上下文切换，同时随机旋转还避免了许多线程之间持续的内存抖动。
+     * 我们将旋转限制在队列的头节点。线程在阻塞之前最多自旋等待SPINS次（每次迭代以50％的概率减少自旋计数）。
+     * 如果唤醒后它未能获得锁，并且仍然是（或成为）第一个等待线程（这表明其他一些线程已经插进来了并获得了锁），则它将提高自旋次数（最多MAX_HEAD_SPINS）以减少不断丢失到插入线程的可能性。
+     *
+     * 几乎所有这些机制都是在acquireWrite和acquireRead方法中执行的，它们是此类代码的典型代表，因为操作和重试依赖于本地缓存的读取的一致集合，因此这些机制（还是方法？）会扩展。
+     *
+     *
+     * 如Boehm的论文（上文）所述，序列验证（主要是validate()方法）要求的顺序规则比应用于正常的volatile（state的）读取的排序规则更严格。
+     * 在尚未强制执行验证的情况下，要确保在验证之前读取和执行验证本身两者的顺序，我们使用Unsafe.loadFence。
+     *
+     *
+     * 内存布局将锁状态和队列指针保持在一起（通常在同一高速缓存行上）。 这通常适用于读大多数的负载。
+     * 在大多数其他情况下，自适应旋转CLH锁会减少内存争用的自然趋势，减少了进一步分散竞争位置的动力，但可能会受将来的改进的支配。
      */
 
     private static final long serialVersionUID = -6001602636862214147L;
 
-    /** Number of processors, for spin control */
+    /** 处理器的数量，为了自旋控制 */
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
 
-    /** Maximum number of retries before enqueuing on acquisition */
+    /** 获取锁时，入队之前最多尝试多少次 */
     private static final int SPINS = (NCPU > 1) ? 1 << 6 : 0;
 
-    /** Maximum number of retries before blocking at head on acquisition */
+    /** 获取锁时，在头节点head上阻塞之前，最多尝试多少次 */
     private static final int HEAD_SPINS = (NCPU > 1) ? 1 << 10 : 0;
 
-    /** Maximum number of retries before re-blocking */
+    /** 在重新阻塞之前，最大尝试次数。*/
     private static final int MAX_HEAD_SPINS = (NCPU > 1) ? 1 << 16 : 0;
 
-    /** The period for yielding when waiting for overflow spinlock */
-    private static final int OVERFLOW_YIELD_RATE = 7; // must be power 2 - 1
+    /** 等待溢出自旋锁时的yielding时间*/
+    private static final int OVERFLOW_YIELD_RATE = 7; // 必须是2的幂-1
 
-    /** The number of bits to use for reader count before overflowing */
+    /** 在溢出前用于读线程计数的位数*/
     private static final int LG_READERS = 7;
 
-    // Values for lock state and stamp operations
+    // 锁状态和戳记操作相关的数值 Values for lock state and stamp operations
     private static final long RUNIT = 1L;
+    //由于低7位给了读线程计数，写线程的计数就是第8位。
     private static final long WBIT  = 1L << LG_READERS;
     private static final long RBITS = WBIT - 1L;
     private static final long RFULL = RBITS - 1L;
     private static final long ABITS = RBITS | WBIT;
     private static final long SBITS = ~RBITS; // note overlap with ABITS
 
-    // Initial value for lock state; avoid failure value zero
+    // 锁状态的初始值； 避免故障值零Initial value for lock state; avoid failure value zero
     private static final long ORIGIN = WBIT << 1;
 
-    // Special value from cancelled acquire methods so caller can throw IE
+    // 取消获取方法中的特殊值，因此调用方可以抛出IE（InterruptedException） Special value from cancelled acquire methods so caller can throw IE
     private static final long INTERRUPTED = 1L;
 
-    // Values for node status; order matters
+    // 节点状态的值； 顺序很重要 Values for node status; order matters
     private static final int WAITING   = -1;
     private static final int CANCELLED =  1;
 
-    // Modes for nodes (int not boolean to allow arithmetic)
+    // 节点的模式（不为布尔值以允许算术） Modes for nodes (int not boolean to allow arithmetic)
     private static final int RMODE = 0;
     private static final int WMODE = 1;
 
-    /** Wait nodes */
+    /** 等待节点 */
     static final class WNode {
         volatile WNode prev;
         volatile WNode next;
-        volatile WNode cowait;    // list of linked readers
-        volatile Thread thread;   // non-null while possibly parked
+        volatile WNode cowait;    // list of linked readers， 连接多个多线程的列表
+        volatile Thread thread;   // non-null while possibly parked 阻塞的时候非空
         volatile int status;      // 0, WAITING, or CANCELLED
-        final int mode;           // RMODE or WMODE
+        final int mode;           // RMODE or WMODE 读还是写
         WNode(int m, WNode p) { mode = m; prev = p; }
     }
 
@@ -268,24 +307,27 @@ public class StampedLock implements java.io.Serializable {
 
     /** Lock sequence/state */
     private transient volatile long state;
-    /** extra reader count when state read count saturated */
+    /** 当state里面的读计数饱和时，额外的读线程计数。extra reader count when state read count saturated */
     private transient int readerOverflow;
 
     /**
-     * Creates a new lock, initially in unlocked state.
+     * 创建一个新的锁，最初处于解锁状态。
      */
     public StampedLock() {
         state = ORIGIN;
     }
 
     /**
-     * Exclusively acquires the lock, blocking if necessary
-     * until available.
+     * 独占地获取锁，如果需要就阻塞直到锁可用。
      *
-     * @return a stamp that can be used to unlock or convert mode
+     * @return 可以用来解锁或转换模式的戳记
      */
     public long writeLock() {
         long s, next;  // bypass acquireWrite in fully unlocked case only
+        //(((s = state) & ABITS) == 0L 表明state中低8位都为0，也就是既没有读线程，也没有写线程。
+        //((s = state) & ABITS) == 0L为true， 则尝试CAS更新state的值
+        //      1.如果CAS成功，返回state的最新值
+        //      2.如果CAS不成功，则返回调用acquireWrite的返回值。
         return ((((s = state) & ABITS) == 0L &&
                  U.compareAndSwapLong(this, STATE, s, next = s + WBIT)) ?
                 next : acquireWrite(false, 0L));
@@ -974,7 +1016,9 @@ public class StampedLock implements java.io.Serializable {
         WNode node = null, p;
         for (int spins = -1;;) { // spin while enqueuing
             long m, s, ns;
+            //((s = state) & ABITS) == 0L 表明state中低8位都为0，也就是既没有读线程，也没有写线程。
             if ((m = (s = state) & ABITS) == 0L) {
+                //尝试更新state，表明获取写锁。
                 if (U.compareAndSwapLong(this, STATE, s, ns = s + WBIT))
                     return ns;
             }
