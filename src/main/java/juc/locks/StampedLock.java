@@ -1346,7 +1346,7 @@ public class StampedLock implements java.io.Serializable {
                     WNode succ, pp;        // 找到有效的后继节点
                     while ((succ = node.next) == null ||
                            succ.status == CANCELLED) {
-                        WNode q = null;    // 从后往前找有效的后继节点，find successor the slow way
+                        WNode q = null;    // 从后往前找有效的后继节点，find successor the slow way todo 看到这里
                         for (WNode t = wtail; t != null && t != node; t = t.prev)
                             if (t.status != CANCELLED)
                                 q = t;     // don't link if succ cancelled
