@@ -209,8 +209,7 @@ public class StampedLock implements java.io.Serializable {
      * 算法注释：
      *
      * 该设计采用了序列锁的元素（在Linux内核中使用；请参见Lameter的http://www.lameter.com/gelato2005.pdf和其他地方；请参见
-     * Boehm的http://www.hpl.hp.com/techreports/2012/HPL-2012-68.html）和有序的RW锁（请参见Shirako等人
-     * http://dl.acm.org/citation.cfm?id=2312015）
+     * Boehm的http://www.hpl.hp.com/techreports/2012/HPL-2012-68.html）和有序的RW锁（请参见Shirako等人 http://dl.acm.org/citation.cfm?id=2312015）
      *
      * 从概念上讲，锁的主要状态包括一个序列号，该序列号在写锁定时是奇数，在其他情况下是偶數。
      * 但是，当读锁定时，读线程计数非0时，state是偏移量。验证"optimisitic" seqlock-reader样式戳记时，将忽略读计数。
@@ -1013,73 +1012,101 @@ public class StampedLock implements java.io.Serializable {
      * @return next state, or INTERRUPTED
      */
     private long acquireWrite(boolean interruptible, long deadline) {
+        //node为当前写线程节点；p为指针，指向尾节点的快照。
         WNode node = null, p;
         for (int spins = -1;;) { // spin while enqueuing
+            //m 用来记录低8为的锁的状态。
+            //s 用来存储state的快照
+            //ns 表示新的newState，也就是保存state的最新值。
             long m, s, ns;
-            //((s = state) & ABITS) == 0L 表明state中低8位都为0，也就是既没有读线程，也没有写线程。
+            //((m = (s = state) & ABITS) == 0L表明state中低8位都为0，也就是既没有读线程，也没有写线程。
             if ((m = (s = state) & ABITS) == 0L) {
-                //尝试更新state，表明获取写锁。
+                //尝试更新state，成功表明获取写锁，并返回最新的state值。
                 if (U.compareAndSwapLong(this, STATE, s, ns = s + WBIT))
                     return ns;
             }
             else if (spins < 0)
+                //给spins赋值，m等于WBIT，也就是只有写锁，wtail == whead,也就是CLH 队列中只有一个节点，那么就给spins赋值为SPINS，否则赋值为0
                 spins = (m == WBIT && wtail == whead) ? SPINS : 0;
             else if (spins > 0) {
+                //消耗spins
                 if (LockSupport.nextSecondarySeed() >= 0)
                     --spins;
             }
-            else if ((p = wtail) == null) { // initialize queue
+            //只有spins为0才会执行到下面的这些判断
+            else if ((p = wtail) == null) { // 初始化队列
+                //如果尾节点为null，表明CLH队列还是空的，下面就尝试初始化该队列。
                 WNode hd = new WNode(WMODE, null);
+                //CAS设置头节点，如果头节点实际值为期望值null，则更新为新值hd。
                 if (U.compareAndSwapObject(this, WHEAD, null, hd))
                     wtail = hd;
             }
-            else if (node == null)
+            else if (node == null) //如果p指向的尾节点不为空，node为空，就新建一个写模式的节点。
                 node = new WNode(WMODE, p);
             else if (node.prev != p)
                 node.prev = p;
-            else if (U.compareAndSwapObject(this, WTAIL, p, node)) {
+            else if (U.compareAndSwapObject(this, WTAIL, p, node)) { //尝试CAS更新尾节点，如果尾节点实际值为期望值p，则更新为新值node,并跳出循环。
                 p.next = node;
                 break;
             }
         }
 
+        //只有执行上一层最后一个else if (U.compareAndSwapObject(this, WTAIL, p, node)) 成功，才会执行下面的逻辑，也就是添加了新的节点作为尾节点。
         for (int spins = -1;;) {
+            //注意，执行到这里时p仍然指向旧的尾节点，也就是是新尾节点的前继节点。
+            //h指向头节点快照
+            //np, node-prev的简称，即节点的前继节点
+            //pp, 为上面p节点（指向尾节点快照）的前继节点，即p-prev的简称
+            //ps， 节点p的状态
             WNode h, np, pp; int ps;
+            //如果头节点快照为p,即尾节点的前继节点。
             if ((h = whead) == p) {
                 if (spins < 0)
                     spins = HEAD_SPINS;
                 else if (spins < MAX_HEAD_SPINS)
                     spins <<= 1;
+
+                //在头节点上自旋。
                 for (int k = spins;;) { // spin at head
-                    long s, ns;
+                    long s, ns; //s存state的快照，ns存state的新值
+                    //如果state中低8位都为0，也就是既没有读线程，也没有写线程。
                     if (((s = state) & ABITS) == 0L) {
+                        //那么就尝试CAS更新state的值
                         if (U.compareAndSwapLong(this, STATE, s,
                                                  ns = s + WBIT)) {
+                            //如果CAS成功，则表明获取写锁成功，则更新头节点，返回新的state值。
                             whead = node;
                             node.prev = null;
                             return ns;
                         }
                     }
+                    //自旋，spins用完了，就跳出循环
                     else if (LockSupport.nextSecondarySeed() >= 0 &&
                              --k <= 0)
                         break;
                 }
             }
-            else if (h != null) { // help release stale waiters
+            else if (h != null) { // help release stale waiters 帮助释放陈旧的等待线程
                 WNode c; Thread w;
                 while ((c = h.cowait) != null) {
+                    //尝试CAS地将h里面的cowait字段值，从c更新为c.cowait
                     if (U.compareAndSwapObject(h, WCOWAIT, c, c.cowait) &&
                         (w = c.thread) != null)
+                        //取消阻塞线程w。
                         U.unpark(w);
                 }
             }
+            //如果头节点快照h与头节点仍然是指向同一个对象，即在此期间头节点没有更新
             if (whead == h) {
+                //如果新节点的prev已经不等于p，则表明p过期了，需要重新指向node.prev
                 if ((np = node.prev) != p) {
                     if (np != null)
                         (p = np).next = node;   // stale
                 }
+                //如果p的状态为0，则更新为WAITING
                 else if ((ps = p.status) == 0)
                     U.compareAndSwapInt(p, WSTATUS, 0, WAITING);
+                //如果p的状态为CANCELLED,尝试更新node的prev跳过这个被CANCELLED的节点。
                 else if (ps == CANCELLED) {
                     if ((pp = p.prev) != null) {
                         node.prev = pp;
@@ -1097,7 +1124,7 @@ public class StampedLock implements java.io.Serializable {
                     node.thread = wt;
                     if (p.status < 0 && (p != h || (state & ABITS) != 0L) &&
                         whead == h && node.prev == p)
-                        U.park(false, time);  // emulate LockSupport.park
+                        U.park(false, time);  // 模仿 LockSupport.park
                     node.thread = null;
                     U.putObject(wt, PARKBLOCKER, null);
                     if (interruptible && Thread.interrupted())
@@ -1284,6 +1311,10 @@ public class StampedLock implements java.io.Serializable {
      * policies). This is a variant of cancellation methods in
      * AbstractQueuedSynchronizer (see its detailed explanation in AQS
      * internal documentation).
+     * 如果节点非空，则在可能的情况下强制取消状态并将其从队列中取消拼接，并唤醒（节点或组（如果适用）的）所有等待者，
+     * 并且在任何情况下都可以帮助释放当前的第一个等待者（如果锁是空闲的）。
+     * （使用空参数进行调用是释放的条件形式，当前不需要，但在将来可能的取消策略下可能需要使用释放）。
+     * 这是AbstractQueuedSynchronizer中取消方法的一种变体（请参阅AQS内部文档中的详细说明）。
      *
      * @param node if nonnull, the waiter
      * @param group either node or the group node is cowaiting with
@@ -1294,25 +1325,28 @@ public class StampedLock implements java.io.Serializable {
         if (node != null && group != null) {
             Thread w;
             node.status = CANCELLED;
-            // unsplice cancelled nodes from group
+            // 从cowait组中取消链接取消了的节点。group-> cancelled cowait->cowait 变为group->cowait
             for (WNode p = group, q; (q = p.cowait) != null;) {
                 if (q.status == CANCELLED) {
+                    //尝试CAS 更新当前p的cowait字段，如果实际值为期望值q，则更新为新值q.cowait。
                     U.compareAndSwapObject(p, WCOWAIT, q, q.cowait);
-                    p = group; // restart
+                    p = group; //重新开始
                 }
+                //探测下一个
                 else
                     p = q;
             }
+            //如果group==node为true，也就是gruop中没有状态为CANCELLED的节点。
             if (group == node) {
                 for (WNode r = group.cowait; r != null; r = r.cowait) {
                     if ((w = r.thread) != null)
-                        U.unpark(w);       // wake up uncancelled co-waiters
+                        U.unpark(w);       // 唤醒未被取消的co-waiter们
                 }
                 for (WNode pred = node.prev; pred != null; ) { // unsplice
-                    WNode succ, pp;        // find valid successor
+                    WNode succ, pp;        // 找到有效的后继节点
                     while ((succ = node.next) == null ||
                            succ.status == CANCELLED) {
-                        WNode q = null;    // find successor the slow way
+                        WNode q = null;    // 从后往前找有效的后继节点，find successor the slow way
                         for (WNode t = wtail; t != null && t != node; t = t.prev)
                             if (t.status != CANCELLED)
                                 q = t;     // don't link if succ cancelled
