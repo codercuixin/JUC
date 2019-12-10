@@ -125,6 +125,8 @@ import java.util.concurrent.TimeUnit;
  *  todo 位操作
  * @since 1.8
  * @author Doug Lea
+ *  第7位统计读锁的持有数
+ *  第8位统计写锁是否被某个线程独占持有
  */
 public class StampedLock implements java.io.Serializable {
     /*
@@ -261,12 +263,12 @@ public class StampedLock implements java.io.Serializable {
     private static final int LG_READERS = 7;
 
     // 锁状态和戳记操作相关的数值 Values for lock state and stamp operations
-    private static final long RUNIT = 1L;
-    //由于低7位给了读线程计数，写线程的计数就是第8位。
-    private static final long WBIT  = 1L << LG_READERS;
-    private static final long RBITS = WBIT - 1L;
-    private static final long RFULL = RBITS - 1L;
-    private static final long ABITS = RBITS | WBIT;
+    private static final long RUNIT = 1L; //Read Unit
+    //由于低7位给了读线程计数，写线程只能有一个用第8位表示是否写锁是否被占有。
+    private static final long WBIT  = 1L << LG_READERS; //Write Bit
+    private static final long RBITS = WBIT - 1L; //Read Bits
+    private static final long RFULL = RBITS - 1L; //Read Full
+    private static final long ABITS = RBITS | WBIT; //All Bits
     private static final long SBITS = ~RBITS; // note overlap with ABITS
 
     // 锁状态的初始值； 避免故障值零Initial value for lock state; avoid failure value zero
@@ -396,11 +398,16 @@ public class StampedLock implements java.io.Serializable {
     /**
      * Non-exclusively acquires the lock, blocking if necessary
      * until available.
+     * 非排他性地获取锁，必要时阻塞直到可用。
      *
-     * @return a stamp that can be used to unlock or convert mode
+     * @return 可以用于解锁或转换模式的戳记
      */
     public long readLock() {
         long s = state, next;  // bypass acquireRead on common uncontended case
+        //s & ABITS) < RFULL 表明没有设置过写锁
+        // U.compareAndSwapLong(this, STATE, s, next = s + RUNIT))  尝试CAS直接设置state值
+        //  如果成功的话，就返回next值
+        //  如果不成功的话，则调用acquireRead
         return ((whead == wtail && (s & ABITS) < RFULL &&
                  U.compareAndSwapLong(this, STATE, s, next = s + RUNIT)) ?
                 next : acquireRead(false, 0L));
@@ -483,11 +490,16 @@ public class StampedLock implements java.io.Serializable {
     /**
      * Returns a stamp that can later be validated, or zero
      * if exclusively locked.
+     * 返回稍后可以验证的戳记；如果排他锁定，则返回零。
      *
      * @return a stamp, or zero if exclusively locked
      */
     public long tryOptimisticRead() {
         long s;
+        //((s = state) & WBIT) == 0L
+        //      如果为true，则表明无写锁，然后返回 s & SBITS 保留了除了第7位的位，这是因为读锁可以共享，所以第7位可以随便变，而其他位则不行。
+        //      如果为false，则返回0
+
         return (((s = state) & WBIT) == 0L) ? (s & SBITS) : 0L;
     }
 
@@ -498,29 +510,38 @@ public class StampedLock implements java.io.Serializable {
      * currently held lock. Invoking this method with a value not
      * obtained from {@link #tryOptimisticRead} or a locking method
      * for this lock has no defined effect or result.
+     * 如果自发放给定戳记以来，还没有线程独占获得该锁，则返回true。
+     * 如果戳记为零，则始终返回false。
+     * 如果戳记代表当前持有的锁，则始终返回true。
+     * 使用未从{@link #tryOptimisticRead}获得的值调用此方法或此锁的锁定方法没有定义的效果或结果。
      *
      * @param stamp a stamp
-     * @return {@code true} if the lock has not been exclusively acquired
-     * since issuance of the given stamp; else false
+     * @return {@code true} 如果自发放给定戳记以来，还没有线程独占获得该锁，则返回true，否则返回false。
      */
     public boolean validate(long stamp) {
+        // Ensures lack of reordering of loads before the fence with loads or stores after the fence.
+        //确保栅栏前面的load或栅栏后面的store不会发生重排序。
         U.loadFence();
+        //因为上面的loadFence, 下面获取的state一定是最新值。 todo 待确认。
+        //比较高25位是否相同。
         return (stamp & SBITS) == (state & SBITS);
     }
 
     /**
      * If the lock state matches the given stamp, releases the
      * exclusive lock.
-     *
-     * @param stamp a stamp returned by a write-lock operation
-     * @throws IllegalMonitorStateException if the stamp does
-     * not match the current state of this lock
+     * 如果锁状态与给定的戳记相匹配，则释放互斥锁定。
+     * @param stamp 有writeLock操作返回的戳记
+     * @throws IllegalMonitorStateException 如果戳记与此锁的当前状态不匹配
      */
     public void unlockWrite(long stamp) {
         WNode h;
+        //如果stamp不等于state的值，或者写锁位为0。
         if (state != stamp || (stamp & WBIT) == 0L)
             throw new IllegalMonitorStateException();
+        //更新state的值
         state = (stamp += WBIT) == 0L ? ORIGIN : stamp;
+        //唤醒后继节点对应的线程。
         if ((h = whead) != null && h.status != 0)
             release(h);
     }
@@ -987,10 +1008,15 @@ public class StampedLock implements java.io.Serializable {
      * pointers are lagging. This may fail to wake up an acquiring
      * thread when one or more have been cancelled, but the cancel
      * methods themselves provide extra safeguards to ensure liveness.
+     * 唤醒h（通常为whead）的后继者。
+     * 这通常只是h.next，但如果下一个指针滞后，则可能需要从wtail向前遍历。
+     * 取消一个或多个线程时，这可能无法唤醒获取线程，但是cancel方法本身提供了额外的保障以确保活性。
      */
     private void release(WNode h) {
         if (h != null) {
+            //q指向h真正的后继节点（未取消的）
             WNode q; Thread w;
+            //尝试CAS更新WNode h的状态，如果实际值等于期望值WAITING，则更新为新值0
             U.compareAndSwapInt(h, WSTATUS, WAITING, 0);
             if ((q = h.next) == null || q.status == CANCELLED) {
                 for (WNode t = wtail; t != null && t != h; t = t.prev)
@@ -1343,22 +1369,28 @@ public class StampedLock implements java.io.Serializable {
                         U.unpark(w);       // 唤醒未被取消的co-waiter们
                 }
                 for (WNode pred = node.prev; pred != null; ) { // unsplice
+                    //succ 最终指向未取消的后继节点。
                     WNode succ, pp;        // 找到有效的后继节点
                     while ((succ = node.next) == null ||
                            succ.status == CANCELLED) {
-                        WNode q = null;    // 从后往前找有效的后继节点，find successor the slow way todo 看到这里
+                        WNode q = null;    //q指向后继节点， 从后往前找有效的后继节点，find successor the slow way todo 看到这里
                         for (WNode t = wtail; t != null && t != node; t = t.prev)
                             if (t.status != CANCELLED)
                                 q = t;     // don't link if succ cancelled
+
+                        //保证node->next链接的确实是未取消的后继节点
                         if (succ == q ||   // ensure accurate successor
                             U.compareAndSwapObject(node, WNEXT,
                                                    succ, succ = q)) {
+                            //执行完上一步succ指向未取消的后继节点，假如node的真正后继节点为空，并且node为尾节点。
                             if (succ == null && node == wtail)
+                                //CAS尝试更新尾节点为node的前继节点。
                                 U.compareAndSwapObject(this, WTAIL, node, pred);
+                            //跳出while循环
                             break;
                         }
                     }
-                    if (pred.next == node) // unsplice pred link
+                    if (pred.next == node) // 将node取消链接到它的前继节点pred
                         U.compareAndSwapObject(pred, WNEXT, node, succ);
                     if (succ != null && (w = succ.thread) != null) {
                         succ.thread = null;
@@ -1366,7 +1398,7 @@ public class StampedLock implements java.io.Serializable {
                     }
                     if (pred.status != CANCELLED || (pp = pred.prev) == null)
                         break;
-                    node.prev = pp;        // repeat if new pred wrong/cancelled
+                    node.prev = pp;        // 重复如果新的prev 错误或者取消了repeat if new pred wrong/cancelled
                     U.compareAndSwapObject(pp, WNEXT, pred, succ);
                     pred = pp;
                 }
@@ -1375,9 +1407,10 @@ public class StampedLock implements java.io.Serializable {
         WNode h; // Possibly release first waiter
         while ((h = whead) != null) {
             long s; WNode q; // similar to release() but check eligibility
+            //q 指向真正的后继节点（未取消的），从后往前扫描。
             if ((q = h.next) == null || q.status == CANCELLED) {
                 for (WNode t = wtail; t != null && t != h; t = t.prev)
-                    if (t.status <= 0)
+                    if (t.status <= 0) //小于等于0表示WAITING或者正常状态（初始化时）
                         q = t;
             }
             if (h == whead) {

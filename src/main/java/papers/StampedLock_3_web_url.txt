@@ -1,0 +1,3 @@
+Ordered RW locks (see Shirako et al http://dl.acm.org/citation.cfm?id=2312015)
+    Design, verification and applications of a new read-write lock algorithm
+Phase-Fair locks (see Brandenburg & Anderson, especially http://www.cs.unc.edu/~bbb/diss/)
