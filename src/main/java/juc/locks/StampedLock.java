@@ -14,29 +14,27 @@ import java.util.concurrent.TimeUnit;
  * represent failure to acquire access. Lock release and conversion
  * methods require stamps as arguments, and fail if they do not match
  * the state of the lock. The three modes are:
- * 一种基于功能的锁，具有三种模式来控制读/写访问。
- * StampedLock的状态由版本和模式组成。
- * 锁获取方法返回一个戳记(stamp)，该戳记表示并控制相对于锁状态的访问；
+ * 一种基于功能的锁，具有三种模式来控制读/写访问。StampedLock的状态由版本和模式组成。
+ * 锁获取方法返回一个戳记(stamp)，该戳记表示锁状态并控制对锁的访问；
  * 这些方法的“try”版本可能会返回特殊值零，以表示无法获取访问权限。
  * 锁释放和转换方法需要使用戳记(stamp)作为参数，如果它们与锁的状态不匹配，则会失败。
  * 三种模式是：
  * <ul>
  *
- *  <li><b>写.</b> 方法{@link #writeLock}可能会阻止等待的独占访问，返回可以在方法{@link #unlockWrite(long)}中使用的戳记(stamp)以释放锁。
- *  还提供了{@link #tryWriteLock}</li>                                                                                            ｝的非定时版本和定时版本。当锁保持在写模式时，可能不会获得任何读锁，并且所有乐观读验证都将失败。
+ *  <li>写模式{@link #writeLock}可能会为了独占访问而阻塞等待，返回可以在方法{@link #unlockWrite(long)}中使用的戳记(stamp)以释放锁。
+ *  还提供了{@link #tryWriteLock}｝的非定时版本和定时版本。当锁保持在写模式时，可能不会获得任何读锁，并且所有乐观读验证都将失败。</li>
  *
- *  <li><b>读.</b>方法 {@link #readLock}可能会阻止等待的非独占访问，返回可以在方法{@link #unlockRead(long)｝中使用的戳记以释放锁。
+ *  <li>读模式{@link #readLock}可能为了非独占访问而阻塞等待，返回可以在方法{@link #unlockRead(long)｝中使用的戳记以释放锁。
  *   还提供了{@link #tryReadLock}的非定时版本和定时版本。</li>
  *
- *  <li><b>乐观读.</b> </li>
- *  乐观读。仅当锁当前未处于写模式时，方法{@link #tryOptimisticRead()}才返回非零戳记(stamp)。
+ *  <li><b>乐观读模式.</b> </li>仅当锁目前未被在写模式下持有，方法{@link #tryOptimisticRead()}才返回非零戳记(stamp)。
  *  如果自获取给定戳记以来没有在写模式下获取锁，则{@link #validate(long)}方法将返回true。
  *  可以将此模式视为读锁的极弱版本，写线程可以随时将其破坏。
  *  对较短的只读代码段使用乐观模式通常可以减少争用并提高吞吐量。
- *  但是，乐观锁的使用是天然地易碎的。
+ *  但是，乐观锁的使用是天生就是脆弱的。
  *  乐观的读取部分代码应仅读取字段并将其保存在局部变量中，以供验证后使用。
  *  在乐观模式下读取的字段可能完全不一致，因此用法仅在你足够熟悉数据表示以检查一致性和/或重复调用方法validate（）时适用。
- *   例如，当首先读取对象或数组引用，然后访问其字段，元素或方法之一时，通常需要执行这些步骤 </li>
+ *  例如，当首先读取对象或数组引用，然后访问其字段，元素或方法之一时，通常需要执行上面这些步骤 </li>
  * </ul>
  *
  * <p>This class also supports methods that conditionally provide
@@ -48,8 +46,7 @@ import java.util.concurrent.TimeUnit;
  * help reduce some of the code bloat that otherwise occurs in
  * retry-based designs.
  * 此类还支持有条件地在三种模式之间提供转换的方法。
- * 例如，方法{@link #tryConvertToWriteLock(long)}尝试“升级”模式，
- * 如果（1）已经处于写模式（2）处于读模式并且没有其他读线程，或者（3）处于乐观模式，则返回有效的写戳记 并且锁是可用的。
+ * 例如，方法tryConvertToWriteLock(long)}尝试“升级”一个模式，如果（1）已经处于写模式（2）处于读模式并且没有其他读线程，或者（3）处于乐观读模式 并且锁是可用的，则返回有效的写戳记。
  * 这些方法的形式旨在帮助减少在基于重试的设计中原本会发生的某些代码膨胀。
  *
  * <p>StampedLocks被设计为在开发线程安全组件时用作内部实用程序。
@@ -62,7 +59,7 @@ import java.util.concurrent.TimeUnit;
  * 未经使用或验证持有超过该期限的戳记可能无法正确验证。
  * StampedLocks是可序列化的，但始终反序列化为初始解锁状态，因此它们对于远程锁定没有用。
  *
- * <p>StampedLock的调度策略并不总是喜欢读线程而不是写线程，反之亦然。
+ * <p>StampedLock的调度策略并不总是相对于写线程更倾向于读线程，反之亦然
  * 所有“try”方法都是尽力而为，不一定符合任何调度或公平性策略。
  * 任何用于获取或转换锁的“try”方法的零返回值都不会携带有关锁状态的任何信息；随后的调用可能会成功。
  *
@@ -125,7 +122,6 @@ import java.util.concurrent.TimeUnit;
  *   }
  * }}</pre>
  *  todo 看论文
- *  todo 位操作
  * @since 1.8
  * @author Doug Lea
  *  第7位统计读锁的持有数
@@ -212,37 +208,37 @@ public class StampedLock implements java.io.Serializable {
      *
      * 算法注释：
      *
-     * 该设计采用了序列锁的元素（在Linux内核中使用；请参见Lameter的http://www.lameter.com/gelato2005.pdf和其他地方；请参见
-     * Boehm的http://www.hpl.hp.com/techreports/2012/HPL-2012-68.html）和有序的RW锁（请参见Shirako等人 http://dl.acm.org/citation.cfm?id=2312015）
+     * StampedLock的设计采用了序列锁的元素（在Linux内核中使用：请参见Lameter的http://www.lameter.com/gelato2005.pdf和
+     * 其他地方：请参见Boehm的http://www.hpl.hp.com/techreports/2012/HPL-2012-68.html）和有序的RW锁（请参见Shirako等人http://dl.acm.org/citation.cfm?id=2312015）
+
      *
-     * 从概念上讲，锁的主要状态包括一个序列号，该序列号在写锁定时是奇数，在其他情况下是偶數。
-     * 但是，当读锁定时，读线程计数非0时，state是偏移量。验证"optimisitic" seqlock-reader样式戳记时，将忽略读计数。
-     * 因为我们必须为读线程们使用少量的有限位数（当前为7），所以当读线程的数量超过count字段时，将使用补充的读线程溢出字。
+     * 从概念上讲，锁的主要状态包括一个序列号，该序列号在写锁定时是奇数，在其他情况下是偶數。 但
+     * 是，当读锁定时，读线程计数非0时，state是偏移量。验证 "optimisitic" seqlock-reader 样式戳记时，将忽略读计数。
+     * 因为我们必须为读线程们使用少量的有限位数（当前为7），所以当读线程的数量超过该7个计数位时，将使用补充的读线程溢出字（即readerOverflow字段）。
      * 为此，我们将最大读线程计数值（RBITS）视为保护溢出更新的自旋锁。
      *
-     * 等待线程们使用AbstractQueuedSynchronizer使用的CLH锁的修改形式（有关完整的描述，请参阅AQS内部文档），其中每个节点都被标记（字段模式）为读线程或写线程。
-     * 等待读线程集合被分组（链接）在一个公共节点（field cowait）下，因此相对于大多数CLH机制而言，这一组等待读线程集合充当单个节点。
-     * 由于队列结构的原因，等待节点们实际上不需要携带序列号；我们知道每一个等待节点的序列号都比其前继节点更大。
-     * 这将调度策略简化为主要是FIFO方案，包含了相位公平（Phase-Fair）锁定的元素（请参见Brandenburg＆Anderson，尤其是http://www.cs.unc.edu/~bbb/diss/）。
-     * 特别地，我们使用相公平(phase-fair)的反插入规则：如果在读锁被持有的同时刚来的读线程到达，但是有排队的写线程，则该刚来的读线程处于排队状态。
-     * （此规则是造成方法AcquireRead的某些复杂性的原因，但是如果没有它，锁将变得非常不公平。）
-     * 释放方法 不会（有时不能）自己唤醒cowaiters。这是由主线程完成的，但是得到了其他任何线程的帮助，由于在方法acquireRead和acquireWrite中没有更好的事情要做。
+     *  等待线程们使用AbstractQueuedSynchronizer使用的CLH锁的修改形式（有关完整的描述，请参阅AQS内部文档），其中每个节点都被标记（field mode）为读线程或写线程。
+     *  等待读线程集合被分组（链接）在一个公共节点（field cowait）下，因此相对于大多数CLH机制而言，这一组等待读线程集合充当单个节点。
+     *  由于队列结构的原因，等待节点们实际上不需要携带序列号；我们知道每一个等待节点的序列号都比其前继节点更大。
+     *  这将调度策略简化为主要是FIFO方案，包含了Phase-Fair locks的元素（请参见Brandenburg＆Anderson，尤其是http://www.cs.unc.edu/~bbb/diss/）。
+     *  特别地，我们使用phase-fair  phase-fair anti-barging(反插入)规则：如果在读锁被持有的同时一个新的读线程来了，但同时已经有排队的写线程，则该新来的读线程处于排队状态
+     *  。（此规则是造成方法acquireRead的某些复杂性的原因，但是如果没有它，锁将变得非常不公平。）
+     *  方法release不会（有时不能）自己唤醒cowaiters。唤醒cowaiters,这是由主线程完成的，但是得到了其他任何线程的帮助，由于在方法acquireRead和acquireWrite中没有更好的事情要做。
      *
-     * 这些规则适用于实际排队的线程。所有tryLock形式都会尝试获取锁，而不管首选项规则，因此可能会将自己“插入”（尝试直接获取到锁）。
-     * 随机旋转在获取方法被使用来减少（越来越昂贵）上下文切换，同时随机旋转还避免了许多线程之间持续的内存抖动。
-     * 我们将旋转限制在队列的头节点。线程在阻塞之前最多自旋等待SPINS次（每次迭代以50％的概率减少自旋计数）。
+     * 这些规则适用于实际排队的线程。所有tryLock形式都会尝试获取锁，而不管偏好规则，因此可能会插到最前面（尝试直接获取到锁）。
+     * 随机自旋在获取方法中被使用来减少（越来越昂贵的）上下文切换，同时随机旋转还避免了许多线程之间持续的内存抖动。我们将旋转限制在队列的头节点。
+     * 线程在阻塞之前最多自旋等待SPINS次（每次迭代以50％的概率减少自旋计数）。
      * 如果唤醒后它未能获得锁，并且仍然是（或成为）第一个等待线程（这表明其他一些线程已经插进来了并获得了锁），则它将提高自旋次数（最多MAX_HEAD_SPINS）以减少不断丢失到插入线程的可能性。
      *
-     * 几乎所有这些机制都是在acquireWrite和acquireRead方法中执行的，它们是此类代码的典型代表，因为操作和重试依赖于本地缓存的读取的一致集合，因此这些机制（还是方法？）会扩展。
+     * 几乎所有这些机制都是在acquireWrite和acquireRead方法中执行的，这两个方法作为此类代码的典型代表，因为操作和重试依赖于本地缓存的读取的一致集合，它们会扩展。
+     * （注释：这就说明了为什么acquireWrite和acquireRead方法里面的代码相对来说特别长）
      *
+     * 正如上面Boehm的论文所述，序列验证（主要是validate()方法）要求的顺序规则比应用于正常的volatile读取state的排序规则更严格。
+     * 为了在那些顺序不被强制要求的情况下，要确保在验证之前读取和验证本身两者的顺序，我们使用Unsafe.loadFence。
      *
-     * 如Boehm的论文（上文）所述，序列验证（主要是validate()方法）要求的顺序规则比应用于正常的volatile（state的）读取的排序规则更严格。
-     * 在尚未强制执行验证的情况下，要确保在验证之前读取和执行验证本身两者的顺序，我们使用Unsafe.loadFence。
-     *
-     *
-     * 内存布局将锁状态和队列指针保持在一起（通常在同一高速缓存行上）。 这通常适用于读大多数的负载。
-     * 在大多数其他情况下，自适应旋转CLH锁会减少内存争用的自然趋势，减少了进一步分散竞争位置的动力，但可能会受将来的改进的支配。
-     */
+     * 内存布局将锁状态和队列指针保持在一起（通常在同一高速缓存行上）。
+     * 这通常适用于读占大多数的负载。在大多数其他情况下，自适应旋转CLH锁减少内存争用的自然趋势，减少了进一步分散竞争位置的动力，但可能会受将来的改进的支配。
+     * */
 
     private static final long serialVersionUID = -6001602636862214147L;
 
@@ -321,7 +317,7 @@ public class StampedLock implements java.io.Serializable {
     }
 
     /**
-     * 独占地获取锁，如果需要就阻塞直到锁可用。
+     * 独占地获取写锁，如果有必须就阻塞直到锁可用。
      *
      * @return 可以用来解锁或转换模式的戳记
      */
@@ -514,7 +510,7 @@ public class StampedLock implements java.io.Serializable {
      * currently held lock. Invoking this method with a value not
      * obtained from {@link #tryOptimisticRead} or a locking method
      * for this lock has no defined effect or result.
-     * 如果自发放给定戳记以来，还没有线程独占获得该锁，则返回true。
+     * 如果自发放给定戳记以来，还没有线程独占获得写锁，则返回true。
      * 如果戳记为零，则始终返回false。
      * 如果戳记代表当前持有的锁，则始终返回true。
      * 使用未从{@link #tryOptimisticRead}获得的值调用此方法或此锁的锁定方法没有定义的效果或结果。
@@ -523,18 +519,17 @@ public class StampedLock implements java.io.Serializable {
      * @return {@code true} 如果自发放给定戳记以来，还没有线程独占获得该锁，则返回true，否则返回false。
      */
     public boolean validate(long stamp) {
-        // Ensures lack of reordering of loads before the fence with loads or stores after the fence.
-        //确保栅栏前面的load或栅栏后面的store不会发生重排序。
+        // 确保屏障前的loads不会与屏障后的loads或stores重排序。
         U.loadFence();
-        //因为上面的loadFence, 下面获取的state一定是最新值。 todo 待确认。
-        //比较高25位是否相同。
+        //因为上面的loadFence, 保证下面的state的加载（load）不会被重排序到之前屏障之前。
+        //比较高25位是否相同, 忽略用来表示读锁持有数的低7位。
         return (stamp & SBITS) == (state & SBITS);
     }
 
     /**
      * If the lock state matches the given stamp, releases the
      * exclusive lock.
-     * 如果锁状态与给定的戳记相匹配，则释放互斥锁定。
+     * 如果锁状态与给定的戳记相匹配，则释放互斥锁。
      * @param stamp 有writeLock操作返回的戳记
      * @throws IllegalMonitorStateException 如果戳记与此锁的当前状态不匹配
      */
@@ -633,7 +628,7 @@ public class StampedLock implements java.io.Serializable {
      * Or, if an optimistic read, returns a write stamp only if
      * immediately available. This method returns zero in all other
      * cases.
-     * 如果锁状态与给定的戳记相匹配，请执行以下操作之一。
+     * 如果锁状态与给定的戳记相匹配，执行以下操作之一。
      * 如果该戳记表示持有写锁，则将其返回。
      * 或者，如果该戳记表示持有读锁，如果此时写锁可用，则释放该读锁并返回一个写戳记。
      * 或者，如果是乐观读取，则仅在锁立即可用时才返回写标记。
@@ -653,12 +648,12 @@ public class StampedLock implements java.io.Serializable {
                     return next;
             }
             else if (m == WBIT) { //如果写锁已经被占有
-                if (a != m) //写锁不是被当前调用线程占有，跳出循环。
+                if (a != m) //写锁不是被当前调用线程占有，跳出循环最后返回0.
                     break;
                 return stamp;
             }
             else if (m == RUNIT && a != 0L) { //只有读锁被占有且最后一个读锁被释放
-                //尝试CAS设置写锁状态位为1，
+                //尝试CAS设置写锁状态位为1
                 if (U.compareAndSwapLong(this, STATE, s,
                                          next = s - RUNIT + WBIT))
                     return next;

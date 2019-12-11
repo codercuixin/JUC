@@ -78,6 +78,22 @@ public final class Unsafe {
      *
      * (It may assist compilers to make the local variable be
      * <code>final</code>.)
+     * 为调用者提供执行不安全操作的能力。
+     *
+     * 返回的<code>Unsafe</code>对象应由调用者小心保护，因为它可用于在任意内存地址处读写数据。 绝不能将其传递给不受信任的代码。
+     *
+     * 此类中的大多数方法都是非常底层的，并且对应于少量的硬件指令（在典型机器上）。 鼓励编译器相应地优化这些方法。
+     *  
+     * <p>下面是使用不安全操作的建议用法： 
+     <blockquote><pre>
+     * class MyTrustedClass {
+     *   private static final Unsafe unsafe = Unsafe.getUnsafe();
+     *   ...
+     *   private long myCountAddress = ...;
+     *   public int getCount() { return unsafe.getByte(myCountAddress); }
+     * }
+     * </pre></blockquote> 
+     * （它可以帮助编译器使局部变量为<code>final</code>。）
      *
      * @exception  SecurityException  if a security manager exists and its
      *             <code>checkPropertiesAccess</code> method doesn't allow
@@ -1056,6 +1072,7 @@ public final class Unsafe {
      * Atomically exchanges the given value with the current value of
      * a field or array element within the given object <code>o</code>
      * at the given <code>offset</code>.
+     *  原子地将给定值newValue与当前值（一个给定对象o，在偏移量为offset处的字段或者数组元素）交换。
      *
      * @param o object/array to update the field/element in
      * @param offset field/element offset
@@ -1075,6 +1092,7 @@ public final class Unsafe {
      * Atomically exchanges the given value with the current value of
      * a field or array element within the given object <code>o</code>
      * at the given <code>offset</code>.
+     * 原子地将给定值newValue与当前值（一个给定对象o，在偏移量为offset处的字段或者数组元素）交换。
      *
      * @param o object/array to update the field/element in
      * @param offset field/element offset
@@ -1094,6 +1112,7 @@ public final class Unsafe {
      * Atomically exchanges the given reference value with the current
      * reference value of a field or array element within the given
      * object <code>o</code> at the given <code>offset</code>.
+     * 原子地将给定引用newValue与当前引用（一个给定对象o，在偏移量为offset处的字段或者数组元素）交换。
      *
      * @param o object/array to update the field/element in
      * @param offset field/element offset
