@@ -121,7 +121,6 @@ import java.util.concurrent.TimeUnit;
  *     }
  *   }
  * }}</pre>
- *  todo 看论文
  * @since 1.8
  * @author Doug Lea
  *  第7位统计读锁的持有数
@@ -269,7 +268,7 @@ public class StampedLock implements java.io.Serializable {
     private static final long ABITS = RBITS | WBIT; //All Bits 11111111
     private static final long SBITS = ~RBITS; // Synchronization BITS 同步相关位，用于获取写锁状态位。注意与ABITS有重叠（第8位）25个1跟7个0，1111 1111 1111 1111 1111 1111 1000 0000
 
-    // 锁状态的初始值； 避免故障值零Initial value for lock state; avoid failure value zero
+    // 锁状态的初始值； 避免故障值零 Initial value for lock state; avoid failure value zero
     private static final long ORIGIN = WBIT << 1;
 
     // 取消获取方法中的特殊值，因此调用方可以抛出IE（InterruptedException） Special value from cancelled acquire methods so caller can throw IE
@@ -287,10 +286,10 @@ public class StampedLock implements java.io.Serializable {
     static final class WNode {
         volatile WNode prev;
         volatile WNode next;
-        volatile WNode cowait;    // list of linked readers， 连接多个多线程的列表
+        volatile WNode cowait;    // list of linked readers， 连接的多个读线程的列表
         volatile Thread thread;   // non-null while possibly parked 阻塞的时候非空
         volatile int status;      // 0, WAITING, or CANCELLED
-        final int mode;           // RMODE or WMODE 读还是写
+        final int mode;           // RMODE or WMODE 读锁模式还是写锁模式
         WNode(int m, WNode p) { mode = m; prev = p; }
     }
 
@@ -304,7 +303,7 @@ public class StampedLock implements java.io.Serializable {
     transient WriteLockView writeLockView;
     transient ReadWriteLockView readWriteLockView;
 
-    /** Lock sequence/state */
+    /** 锁序列/状态 Lock sequence/state */
     private transient volatile long state;
     /** 当state里面的读计数饱和时，额外的读线程计数。extra reader count when state read count saturated */
     private transient int readerOverflow;
@@ -323,10 +322,8 @@ public class StampedLock implements java.io.Serializable {
      */
     public long writeLock() {
         long s, next;  // bypass acquireWrite in fully unlocked case only
-        //(((s = state) & ABITS) == 0L 表明state中低8位都为0，也就是既没有读线程，也没有写线程。
-        //((s = state) & ABITS) == 0L为true， 则尝试CAS更新state的值
-        //      1.如果CAS成功，返回state的最新值
-        //      2.如果CAS不成功，则返回调用acquireWrite的返回值。
+        // ((s = state) & ABITS)，只保留state本地值s的8位，如果低8位都为0，也就是既没有读线程，也没有写线程，则等于0为true，否则等于0为false。
+        // 如果((s = state) & ABITS) == 0L为true， 并且CAS操作成功，才直接返回新的state值；其他情况都返回acquireWrite(false, 0L))的调用结果。
         return ((((s = state) & ABITS) == 0L &&
                  U.compareAndSwapLong(this, STATE, s, next = s + WBIT)) ?
                 next : acquireWrite(false, 0L));
@@ -340,9 +337,7 @@ public class StampedLock implements java.io.Serializable {
     public long tryWriteLock() {
         long s, next;
         //(((s = state) & ABITS) == 0L 表明state中低8位都为0，也就是既没有读线程，也没有写线程。
-        //((s = state) & ABITS) == 0L为true， 则尝试CAS更新state的值
-        //      1.如果CAS成功，返回state的最新值
-        //      2.如果CAS不成功，直接返回0，表示尝试不成功。
+        //如果((s = state) & ABITS) == 0L为true， 并且CAS成功，则返回state的最新值；其他情况返回0，表示尝试不成功。
         return ((((s = state) & ABITS) == 0L &&
                  U.compareAndSwapLong(this, STATE, s, next = s + WBIT)) ?
                 next : 0L);
@@ -403,8 +398,8 @@ public class StampedLock implements java.io.Serializable {
         long s = state, next;  // bypass acquireRead on common uncontended case
         //s & ABITS) < RFULL 表明没有设置过写锁
         // U.compareAndSwapLong(this, STATE, s, next = s + RUNIT))  尝试CAS直接设置state值
-        //  如果成功的话，就返回next值
-        //  如果不成功的话，则调用acquireRead
+        //  如果上述两者都为true，就返回next值
+        //  否则，则调用acquireRead
         return ((whead == wtail && (s & ABITS) < RFULL &&
                  U.compareAndSwapLong(this, STATE, s, next = s + RUNIT)) ?
                 next : acquireRead(false, 0L));
@@ -419,16 +414,16 @@ public class StampedLock implements java.io.Serializable {
     public long tryReadLock() {
         for (;;) {
             long s, m, next;
-            //如果写锁被某个线程持有
+            //如果写锁被某个线程持有,就立即返回0，表示获取失败
             if ((m = (s = state) & ABITS) == WBIT)
                 return 0L;
-            //state上的读锁持有数未满，
+            //state上的低7位读锁持有数未满
             else if (m < RFULL) {
                 //CAS，尝试给state加RUNIT，表明读锁持有数增加1.
                 if (U.compareAndSwapLong(this, STATE, s, next = s + RUNIT))
                     return next;
             }
-            //state上的读锁持有数已满，尝试使用readOverFlow帮忙统计额外的读锁持有数。
+            //state上的低7位读锁持有数已满，尝试使用readOverFlow帮忙统计额外的读锁持有数。
             else if ((next = tryIncReaderOverflow(s)) != 0L)
                 return next;
         }
@@ -497,7 +492,7 @@ public class StampedLock implements java.io.Serializable {
     public long tryOptimisticRead() {
         long s;
         //((s = state) & WBIT) == 0L
-        //      如果为true，则表明无写锁，然后返回 s & SBITS 保留了除了第7位的位，这是因为读锁可以共享，所以第7位可以随便变，而其他位则不行。
+        //      如果为true，则表明无写锁，然后返回 s & SBITS 保留了除了低7位的位，这是因为读锁可以共享，所以第7位可以随便变，而其他位则不行。
         //      如果为false，则返回0
 
         return (((s = state) & WBIT) == 0L) ? (s & SBITS) : 0L;
@@ -538,7 +533,10 @@ public class StampedLock implements java.io.Serializable {
         //如果stamp不等于state的值，或者写锁位为0。
         if (state != stamp || (stamp & WBIT) == 0L)
             throw new IllegalMonitorStateException();
-        //更新state的值
+
+        //更新state的值。
+        //原来低8位是1000 0000，加上1000 0000，那么低8位就变为0000 0000， 也就是释放了写锁。
+        //当然此时会向高位进1，如果stamp溢出，就重置为ORIGIN。
         state = (stamp += WBIT) == 0L ? ORIGIN : stamp;
         //唤醒后继节点对应的线程。
         if ((h = whead) != null && h.status != 0)
@@ -565,7 +563,7 @@ public class StampedLock implements java.io.Serializable {
             if (((s = state) & SBITS) != (stamp & SBITS) ||
                 (stamp & ABITS) == 0L || (m = s & ABITS) == 0L || m == WBIT)
                 throw new IllegalMonitorStateException();
-            //如果写相关位未满，即低7位小于1111110
+            //如果读相关位未满，即低7位小于1111110
             if (m < RFULL) {
                 //CAS 减少state值
                 if (U.compareAndSwapLong(this, STATE, s, s - RUNIT)) {
@@ -575,7 +573,7 @@ public class StampedLock implements java.io.Serializable {
                     break;
                 }
             }
-            //如果写相关为已满，则尝试减少readerOverflow的值。
+            //如果读相关为已满，则尝试减少readerOverflow的值。
             else if (tryDecReaderOverflow(s) != 0L)
                 break;
         }
@@ -596,6 +594,9 @@ public class StampedLock implements java.io.Serializable {
             else if (m == WBIT) { //当前状态为写锁被某个线程占有
                 if (a != m)
                     break;
+                //更新state的值。
+                //原来低8位是1000 0000，加上1000 0000，那么低8位就变为0000 0000， 也就是释放了写锁。
+                //当然此时会向高位进1，如果stamp溢出，就重置为ORIGIN。
                 state = (s += WBIT) == 0L ? ORIGIN : s;
                 if ((h = whead) != null && h.status != 0)
                     release(h);
@@ -745,6 +746,9 @@ public class StampedLock implements java.io.Serializable {
             else if (m == WBIT) {//如果只持有写锁
                 if (a != m) //如果过去的stamp未持有写锁
                     break;
+                //更新state的值。
+                //原来低8位是1000 0000，加上1000 0000，那么低8位就变为0000 0000， 也就是释放了写锁。
+                //当然此时会向高位进1，如果stamp溢出，就重置为ORIGIN。
                 state = next = (s += WBIT) == 0L ? ORIGIN : s;
                 if ((h = whead) != null && h.status != 0)
                     release(h);
@@ -778,6 +782,9 @@ public class StampedLock implements java.io.Serializable {
     public boolean tryUnlockWrite() {
         long s; WNode h;
         if (((s = state) & WBIT) != 0L) { //如果写锁被某个线程持有（不一定是当前线程）
+            //更新state的值。
+            //原来低8位是1000 0000，加上1000 0000，那么低8位就变为0000 0000， 也就是释放了写锁。
+            //当然此时会向高位进1，如果stamp溢出，就重置为ORIGIN。
             state = (s += WBIT) == 0L ? ORIGIN : s;
             if ((h = whead) != null && h.status != 0)
                 //释放h的后继节点
@@ -970,6 +977,9 @@ public class StampedLock implements java.io.Serializable {
         WNode h; long s;
         if (((s = state) & WBIT) == 0L) //如果state第8位没有被设置为1
             throw new IllegalMonitorStateException();
+        //更新state的值。
+        //原来低8位是1000 0000，加上1000 0000，那么低8位就变为0000 0000， 也就是释放了写锁。
+        //当然此时会向高位进1，如果stamp溢出，就重置为ORIGIN。
         state = (s += WBIT) == 0L ? ORIGIN : s;
         if ((h = whead) != null && h.status != 0)
             release(h);
@@ -1073,11 +1083,13 @@ public class StampedLock implements java.io.Serializable {
             //尝试CAS更新WNode h的状态，如果实际值等于期望值WAITING，则更新为新值0
             U.compareAndSwapInt(h, WSTATUS, WAITING, 0);
             if ((q = h.next) == null || q.status == CANCELLED) {
+                //从后往前，将q指向h真正的后继节点（未取消的）
                 for (WNode t = wtail; t != null && t != h; t = t.prev)
                     if (t.status <= 0)
                         q = t;
             }
             if (q != null && (w = q.thread) != null)
+                //唤醒线程w
                 U.unpark(w);
         }
     }
@@ -1092,38 +1104,45 @@ public class StampedLock implements java.io.Serializable {
      * @return next state, or INTERRUPTED
      */
     private long acquireWrite(boolean interruptible, long deadline) {
-        //node为当前写线程节点；p为指针，指向尾节点的快照。
+        //node为当前写线程节点；p为指针，指向node的prev，即前继节点。
         WNode node = null, p;
         for (int spins = -1;;) { // spin while enqueuing
             //m 用来记录低8为的锁的状态。
             //s 用来存储state的快照
             //ns 表示新的newState，也就是保存state的最新值。
             long m, s, ns;
-            //((m = (s = state) & ABITS) == 0L表明state中低8位都为0，也就是既没有读线程，也没有写线程。
+            //如果可以拿到写锁，就尝试直接获取写锁。
+            // 如果((m = (s = state) & ABITS) == 0L 为true，则表明state中低8位都为0，也就是既没有读线程，也没有写线程。
             if ((m = (s = state) & ABITS) == 0L) {
-                //尝试更新state，成功表明获取写锁，并返回最新的state值。
+                //CAS尝试state的本地缓存值s加WBIT，成功表明获取写锁，并返回最新的state值。
                 if (U.compareAndSwapLong(this, STATE, s, ns = s + WBIT))
                     return ns;
             }
+
+
+            //下面的两个else if 主要对应上面的算法描述：我们将自旋限制在队列的头节点。线程在阻塞之前最多自旋等待SPINS次（每次迭代以50％的概率减少自旋计数
             else if (spins < 0)
-                //给spins赋值，m等于WBIT，也就是只有写锁，wtail == whead,也就是CLH 队列中只有一个节点，那么就给spins赋值为SPINS，否则赋值为0
+                //给spins赋值。如果只持有写锁(wtail == whead为true)，并且CLH 队列中只有一个节点（wtail == whead为true），那么就给spins赋值为SPINS，否则赋值为0
                 spins = (m == WBIT && wtail == whead) ? SPINS : 0;
             else if (spins > 0) {
-                //消耗spins
+                //随机自旋
                 if (LockSupport.nextSecondarySeed() >= 0)
+                    //每次迭代以50％的概率减少自旋计数
                     --spins;
             }
-            //只有spins为0才会执行到下面的这些判断
+
+            //下面这几个else if主要是CLH队列相关的操作
+            //只有spins为0才可能会执行到下面的这些判断
             else if ((p = wtail) == null) { // 初始化队列
                 //如果尾节点为null，表明CLH队列还是空的，下面就尝试初始化该队列。
                 WNode hd = new WNode(WMODE, null);
-                //CAS设置头节点，如果头节点实际值为期望值null，则更新为新值hd。
+                //CAS设置头节点，如果头节点实际值为期望值null，则将头节点更新为新值hd。
                 if (U.compareAndSwapObject(this, WHEAD, null, hd))
                     wtail = hd;
             }
             else if (node == null) //如果p指向的尾节点不为空，node为空，就新建一个写模式的节点。
                 node = new WNode(WMODE, p);
-            else if (node.prev != p)
+            else if (node.prev != p) //让p成为node的前继节点
                 node.prev = p;
             else if (U.compareAndSwapObject(this, WTAIL, p, node)) { //尝试CAS更新尾节点，如果尾节点实际值为期望值p，则更新为新值node,并跳出循环。
                 p.next = node;
@@ -1139,17 +1158,19 @@ public class StampedLock implements java.io.Serializable {
             //pp, 为上面p节点（指向尾节点快照）的前继节点，即p-prev的简称
             //ps， 节点p的状态
             WNode h, np, pp; int ps;
-            //如果头节点快照为p,即尾节点的前继节点。
+
+            //下面第一个if 对应上面的算法描述一句：如果唤醒后它未能获得锁，并且仍然是（或成为）第一个等待线程（这表明其他一些线程已经插进来了并获得了锁），
+            // 则它将提高自旋次数（最多MAX_HEAD_SPINS）以减少不断丢失到插入线程的可能性。
+            //简单说，如果前继节点为头节点，就提高次数到MAX_HEAD_SPINS，来提高当前线程获取写锁的可能性。
             if ((h = whead) == p) {
                 if (spins < 0)
                     spins = HEAD_SPINS;
                 else if (spins < MAX_HEAD_SPINS)
                     spins <<= 1;
-
                 //在头节点上自旋。
                 for (int k = spins;;) { // spin at head
                     long s, ns; //s存state的快照，ns存state的新值
-                    //如果state中低8位都为0，也就是既没有读线程，也没有写线程。
+                    //如果state中低8位都为0，也就是既没有读线程，也没有写线程，则尝试获取写锁
                     if (((s = state) & ABITS) == 0L) {
                         //那么就尝试CAS更新state的值
                         if (U.compareAndSwapLong(this, STATE, s,
@@ -1166,17 +1187,18 @@ public class StampedLock implements java.io.Serializable {
                         break;
                 }
             }
+
+            //唤醒由节点h的cowaiters， 即由cowait字段链接而成的读线程列表。
             else if (h != null) { // help release stale waiters 帮助释放陈旧的等待线程
                 WNode c; Thread w;
                 while ((c = h.cowait) != null) {
-                    //尝试CAS地将h里面的cowait字段值，从c更新为c.cowait
                     if (U.compareAndSwapObject(h, WCOWAIT, c, c.cowait) &&
                         (w = c.thread) != null)
                         //取消阻塞线程w。
                         U.unpark(w);
                 }
             }
-            //如果头节点快照h与头节点仍然是指向同一个对象，即在此期间头节点没有更新
+            //如果头节点快照h与头节点whead仍然是指向同一个对象，即在此期间头节点没有更新
             if (whead == h) {
                 //如果新节点的prev已经不等于p，则表明p过期了，需要重新指向node.prev
                 if ((np = node.prev) != p) {
@@ -1198,16 +1220,22 @@ public class StampedLock implements java.io.Serializable {
                     if (deadline == 0L)
                         time = 0L;
                     else if ((time = deadline - System.nanoTime()) <= 0L)
+                        //如果已经超时，则取消等待
                         return cancelWaiter(node, node, false);
                     Thread wt = Thread.currentThread();
                     U.putObject(wt, PARKBLOCKER, this);
                     node.thread = wt;
+                    //p.status < 0 节点p处于WAITING状态
+                    //(p != h || (state & ABITS) != 0L)： p!=h 为true 节点p不为头节点； state & ABITS) != 0L 读锁或写锁被其他线程持有
+                    //whead == h : 头节点快照值h仍然与头节点whead指向相同的对象
+                    //node.prev == p node的前继节点为p
                     if (p.status < 0 && (p != h || (state & ABITS) != 0L) &&
                         whead == h && node.prev == p)
-                        U.park(false, time);  // 模仿 LockSupport.park
+                        U.park(false, time);  // 阻塞当前线程，time纳秒，模仿 LockSupport.park
                     node.thread = null;
                     U.putObject(wt, PARKBLOCKER, null);
                     if (interruptible && Thread.interrupted())
+                        //如果可中断，并且当前线程被中断，则取消等待
                         return cancelWaiter(node, node, true);
                 }
             }
@@ -1225,6 +1253,8 @@ public class StampedLock implements java.io.Serializable {
         WNode node = null, p; //node新增的节点，p最终指向node的前继节点
         for (int spins = -1;;) {
             WNode h;
+            //下面第一个if主要是在自旋过程中，看看能不能获取读锁。
+            //对应算法描述中的：我们将自旋限制在队列的头节点。线程在阻塞之前最多自旋等待SPINS次（每次迭代以50％的概率减少自旋计数）。
             if ((h = whead) == (p = wtail)) {
                 //m 为锁模式,也就是记录低8位的值
                 //s 为state的快照值
@@ -1240,16 +1270,16 @@ public class StampedLock implements java.io.Serializable {
                         //上面二者有一个成功的就返回新的state值，表明增加读锁持有数成功。
                         return ns;
                     else if (m >= WBIT) { //如果写锁被某个线程持有
-                        if (spins > 0) { //自旋
+                        if (spins > 0) { //随机自旋
                             if (LockSupport.nextSecondarySeed() >= 0)
                                 --spins;
                         }
                         else {
                             if (spins == 0) {
                                 //自旋结束，尝试跳出循环。
-                                // 如果首尾节点没有变更或者首尾节点不等，就跳出里面这层循环（注意这里跳出后，h，p分别是最新的头尾节点快照值）
                                 WNode nh = whead, np = wtail;
                                 if ((nh == h && np == p) || (h = nh) != (p = np))
+                                    //对应算法描述中的一句：如果在读锁被持有的同时一个新的读线程来了，但同时已经有排队的写线程，则该新来的读线程处于排队状态
                                     break;
                             }
                             //第一次spins为-1，只会执行下面的赋值。
@@ -1258,6 +1288,7 @@ public class StampedLock implements java.io.Serializable {
                     }
                 }
             }
+
             if (p == null) { // 初始化队列。
                 WNode hd = new WNode(WMODE, null);
                 if (U.compareAndSwapObject(this, WHEAD, null, hd))
@@ -1265,10 +1296,10 @@ public class StampedLock implements java.io.Serializable {
             }
             else if (node == null)
                 node = new WNode(RMODE, p);
-            else if (h == p || p.mode != RMODE) { //如果尾节点的模式不为读锁模式，将新节点添加到队列上，作为新的尾节点。
-                if (node.prev != p)
+            else if (h == p || p.mode != RMODE) {
+                if (node.prev != p) //将p指向node的prev
                     node.prev = p;
-                else if (U.compareAndSwapObject(this, WTAIL, p, node)) {
+                else if (U.compareAndSwapObject(this, WTAIL, p, node)) { //将node链接到队尾，成为新的wtail节点。
                     p.next = node;
                     break;
                 }
@@ -1280,14 +1311,16 @@ public class StampedLock implements java.io.Serializable {
             else {
                 for (;;) {
                     WNode pp, c; Thread w;
+                    //唤醒节点h cowaiter队列中的第一个读线程
                     if ((h = whead) != null && (c = h.cowait) != null &&
                         U.compareAndSwapObject(h, WCOWAIT, c, c.cowait) &&
                         (w = c.thread) != null) // help release
                         U.unpark(w);
+                    //注意p指向node的前继节点。
                     if (h == (pp = p.prev) || h == p || pp == null) {
                         long m, s, ns;
                         do {
-                            // 下面的if尝试增加读锁计数。
+                            // 下面的if尝试增加读锁计数
                             // (m = (s = state) & ABITS) < RFULL
                             //      如果为true，则表明没有线程获取写锁，且读锁持有数未满；然后尝试CAS给state加1，也就是读锁持有数加1.
                             //      如果为false，则(m < WBIT && (ns = tryIncReaderOverflow(s)) != 0L)，意思是只有写锁没有被占有并且第7位已经全是1，才会去尝试增加readerOverflow的计数
@@ -1299,7 +1332,6 @@ public class StampedLock implements java.io.Serializable {
                                 return ns;
                         } while (m < WBIT);
                     }
-
 
                     if (whead == h && p.prev == pp) {
                         long time;
@@ -1317,11 +1349,11 @@ public class StampedLock implements java.io.Serializable {
                         node.thread = wt;
                         if ((h != pp || (state & ABITS) == WBIT) &&
                             whead == h && p.prev == pp)
-                            U.park(false, time);
+                            U.park(false, time); //阻塞当前线程time纳秒
                         node.thread = null;
                         U.putObject(wt, PARKBLOCKER, null);
                         if (interruptible && Thread.interrupted())
-                            //如果当前线程被中断了，也需求取消等待。
+                            //如果参数interruptible为true，并且当前线程被中断了。
                             return cancelWaiter(node, p, true);
                     }
                 }

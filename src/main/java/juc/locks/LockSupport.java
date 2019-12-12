@@ -275,7 +275,6 @@ public class LockSupport {
 
     /**
      * 返回伪随机初始化或更新的辅助种子。由于包访问限制，从ThreadLocalRandom复制。
-     * todo 这个是在干嘛？
      */
     static final int nextSecondarySeed() {
         int r;
