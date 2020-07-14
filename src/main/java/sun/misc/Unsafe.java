@@ -57,16 +57,22 @@ public final class Unsafe {
     /**
      * Provides the caller with the capability of performing unsafe
      * operations.
+     * 为调用者提供执行不安全操作的能力。
      *
      * <p> The returned <code>Unsafe</code> object should be carefully guarded
      * by the caller, since it can be used to read and write data at arbitrary
      * memory addresses.  It must never be passed to untrusted code.
+     * 返回的<code>Unsafe</code>对象应由调用者小心保护，
+     * 因为它可用于在任意内存地址处读写数据。 绝不能将其传递给不受信任的代码。
      *
      * <p> Most methods in this class are very low-level, and correspond to a
      * small number of hardware instructions (on typical machines).  Compilers
      * are encouraged to optimize these methods accordingly.
+     * <p>此类中的大多数方法都是非常底层的，并且对应于少量的硬件指令（在典型机器上）。
+     * 鼓励编译器相应地优化这些方法。
      *
      * <p> Here is a suggested idiom for using unsafe operations:
+     * <p>下面是使用不安全操作的建议用法： 
      *
      * <blockquote><pre>
      * class MyTrustedClass {
@@ -79,27 +85,13 @@ public final class Unsafe {
      *
      * (It may assist compilers to make the local variable be
      * <code>final</code>.)
-     *
-     * 为调用者提供执行不安全操作的能力。
-     *
-     * 返回的<code>Unsafe</code>对象应由调用者小心保护，因为它可用于在任意内存地址处读写数据。 绝不能将其传递给不受信任的代码。
-     *
-     * 此类中的大多数方法都是非常底层的，并且对应于少量的硬件指令（在典型机器上）。 鼓励编译器相应地优化这些方法。
-     *  
-     * <p>下面是使用不安全操作的建议用法： 
-     <blockquote><pre>
-     * class MyTrustedClass {
-     *   private static final Unsafe unsafe = Unsafe.getUnsafe();
-     *   ...
-     *   private long myCountAddress = ...;
-     *   public int getCount() { return unsafe.getByte(myCountAddress); }
-     * }
-     * </pre></blockquote> 
      * （它可以帮助编译器使局部变量为<code>final</code>。）
      *
      * @exception  SecurityException  if a security manager exists and its
      *             <code>checkPropertiesAccess</code> method doesn't allow
      *             access to the system properties.
+     *             如果存在安全管理器，并且其<code>checkPropertiesAccess</code>方法不允许访问系统属性,
+     *             则抛出SecurityException异常
      */
     @CallerSensitive
     public static Unsafe getUnsafe() {
