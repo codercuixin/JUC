@@ -46,161 +46,78 @@ import java.util.List;
 import java.util.RandomAccess;
 
 /**
- * Abstract base class for tasks that run within a {@link ForkJoinPool}.
- * A {@code ForkJoinTask} is a thread-like entity that is much
- * lighter weight than a normal thread.  Huge numbers of tasks and
- * subtasks may be hosted by a small number of actual threads in a
- * ForkJoinPool, at the price of some usage limitations.
+ * 一个在ForkJoinPool中运行的任务的抽象基类。
+ *  ForkJoinTask是类似于线程的实体，其比普通线程更加轻量。
+ * 大量的任务和子任务可能由ForkJoinPool中的少量实际线程托管，但以某些使用限制为代价。
  *
- * <p>A "main" {@code ForkJoinTask} begins execution when it is
- * explicitly submitted to a {@link ForkJoinPool}, or, if not already
- * engaged in a ForkJoin computation, commenced in the {@link
- * ForkJoinPool#commonPool()} via {@link #fork}, {@link #invoke}, or
- * related methods.  Once started, it will usually in turn start other
- * subtasks.  As indicated by the name of this class, many programs
- * using {@code ForkJoinTask} employ only methods {@link #fork} and
- * {@link #join}, or derivatives such as {@link
- * #invokeAll(juc.ForkJoinTask...) invokeAll}.  However, this class also
- * provides a number of other methods that can come into play in
- * advanced usages, as well as extension mechanics that allow support
- * of new forms of fork/join processing.
+ * 一个“main” ForkJoinTask在显式提交给ForkJoinPool时开始执行，或者，如果尚未参与ForkJoin计算，则通过fork()，invoke（）或相关方法在ForkJoinPool.commonPool（）中开始。
+ * 一旦启动，通常将依次启动其他子任务。
+ * 如此类的名称所示，许多使用ForkJoinTask的程序仅使用方法fork（）和join（）或派生类（例如invokeAll）。
+ * 但是，此类还提供了许多其他可以在高级用法中使用的方法，以及允许支持新形式的fork / join处理的扩展机制。
  *
- * <p>A {@code ForkJoinTask} is a lightweight form of {@link Future}.
- * The efficiency of {@code ForkJoinTask}s stems from a set of
- * restrictions (that are only partially statically enforceable)
- * reflecting their main use as computational tasks calculating pure
- * functions or operating on purely isolated objects.  The primary
- * coordination mechanisms are {@link #fork}, that arranges
- * asynchronous execution, and {@link #join}, that doesn't proceed
- * until the task's result has been computed.  Computations should
- * ideally avoid {@code synchronized} methods or blocks, and should
- * minimize other blocking synchronization apart from joining other
- * tasks or using synchronizers such as Phasers that are advertised to
- * cooperate with fork/join scheduling. Subdividable tasks should also
- * not perform blocking I/O, and should ideally access variables that
- * are completely independent of those accessed by other running
- * tasks. These guidelines are loosely enforced by not permitting
- * checked exceptions such as {@code IOExceptions} to be
- * thrown. However, computations may still encounter unchecked
- * exceptions, that are rethrown to callers attempting to join
- * them. These exceptions may additionally include {@link
- * RejectedExecutionException} stemming from internal resource
- * exhaustion, such as failure to allocate internal task
- * queues. Rethrown exceptions behave in the same way as regular
- * exceptions, but, when possible, contain stack traces (as displayed
- * for example using {@code ex.printStackTrace()}) of both the thread
- * that initiated the computation as well as the thread actually
- * encountering the exception; minimally only the latter.
+ * ForkJoinTask是Future的轻量级形式。
+ * ForkJoinTasks的效率源于一组限制（只能部分静态地强制执行），反映了它们的主要用途是计算任务，这些计算任务是计算纯函数或对纯隔离对象进行操作。
+ * 主要的协调机制是fork（）（用于安排异步执行）和join（）（在计算任务结果之前不会继续执行）。
+ * 理想情况下，计算应避免使用同步的方法或块，并应最小化其他块同步，除了joining（等待）其他任务或者使用同步器（例如Phaser被告知用来与fork/join调度合作）。
+ * 可细分的任务也不应执行阻塞的I / O，并且理想情况下应访问与其他正在运行的任务访问的变量完全独立的变量。
+ * 不允许抛出诸如IOExceptions之类的检查异常，从而松散地实施了这些准则。
+ * 但是，计算可能仍然会遇到未经检查的异常，这些异常会被尝试joining它们的调用者重新抛出。
+ * 这些异常可能还包括源自内部资源耗尽的RejectedExecutionException，例如未能分配内部任务队列。
+ * 重新抛出的异常的行为与常规异常相同，但是在可能的情况下，包含启动计算的线程以及实际遇到该异常的线程的堆栈跟踪（正如使用ex.printStackTrace（）显示的）；最少会有后者。
  *
- * <p>It is possible to define and use ForkJoinTasks that may block,
- * but doing do requires three further considerations: (1) Completion
- * of few if any <em>other</em> tasks should be dependent on a task
- * that blocks on external synchronization or I/O. Event-style async
- * tasks that are never joined (for example, those subclassing {@link
- * CountedCompleter}) often fall into this category.  (2) To minimize
- * resource impact, tasks should be small; ideally performing only the
- * (possibly) blocking action. (3) Unless the {@link
- * ForkJoinPool.ManagedBlocker} API is used, or the number of possibly
- * blocked tasks is known to be less than the pool's {@link
- * ForkJoinPool#getParallelism} level, the pool cannot guarantee that
- * enough threads will be available to ensure progress or good
- * performance.
+ * 可以定义和使用可能阻塞的ForkJoinTasks，但这样做还需要三点考虑：（1）只有很少的Completion（如果有的话）应该依赖于在外部同步或I / O上阻塞的任务。
+ * 从未joined的事件风格的异步任务（例如，那些CountedCompleter的子类）通常属于此类。
+ * （2）为了最小化资源影响，任务应该很小；理想情况下，仅执行（可能）阻塞操作。
+ *  （3）除非使用了ForkJoinPool.ManagedBlocker API，或者已知可能被阻塞的任务数小于线程池的ForkJoinPool.getParallelism（）数目，否则线程池无法保证有足够的线程可用以确保进度或良好的性能。
  *
- * <p>The primary method for awaiting completion and extracting
- * results of a task is {@link #join}, but there are several variants:
- * The {@link Future#get} methods support interruptible and/or timed
- * waits for completion and report results using {@code Future}
- * conventions. Method {@link #invoke} is semantically
- * equivalent to {@code fork(); join()} but always attempts to begin
- * execution in the current thread. The "<em>quiet</em>" forms of
- * these methods do not extract results or report exceptions. These
- * may be useful when a set of tasks are being executed, and you need
- * to delay processing of results or exceptions until all complete.
- * Method {@code invokeAll} (available in multiple versions)
- * performs the most common form of parallel invocation: forking a set
- * of tasks and joining them all.
+ * 等待完成和提取任务结果的主要方法是join（），但有几种变体：Future.get（）方法支持可中断和/或定时等待完成，并使用Future约定报告结果。
+ * 方法invoke（）在语义上等效于fork（）; join（），但总是尝试在当前线程中开始执行。
+ * 这些方法的“安静”形式不会提取结果或报告异常。当执行一组任务时，这些功能可能很有用，并且需要将结果或异常的处理延迟到所有任务完成为止。
+ * 方法invokeAll（有多个版本可用）执行并行调用的最常见形式：forking分派一组任务并将等待joining它们。
  *
- * <p>In the most typical usages, a fork-join pair act like a call
- * (fork) and return (join) from a parallel recursive function. As is
- * the case with other forms of recursive calls, returns (joins)
- * should be performed innermost-first. For example, {@code a.fork();
- * b.fork(); b.join(); a.join();} is likely to be substantially more
- * efficient than joining {@code a} before {@code b}.
+ * 在最典型的用法中，fork-join对的作用类似于从并行递归函数中调用（fork）和返回（join）。与其他形式的递归调用一样，返回（joins）应从最里面开始执行。
+ * 例如，a.fork（）; b.fork（）; b.join（）; a.join（）;可能比在b之前等待joining a更有效。
  *
- * <p>The execution status of tasks may be queried at several levels
- * of detail: {@link #isDone} is true if a task completed in any way
- * (including the case where a task was cancelled without executing);
- * {@link #isCompletedNormally} is true if a task completed without
- * cancellation or encountering an exception; {@link #isCancelled} is
- * true if the task was cancelled (in which case {@link #getException}
- * returns a {@link CancellationException}); and
- * {@link #isCompletedAbnormally} is true if a task was either
- * cancelled or encountered an exception, in which case {@link
- * #getException} will return either the encountered exception or
- * {@link CancellationException}.
+ * 可以从多个详细级别查询任务的执行状态：
+ * 如果任务以任何方式完成（包括取消任务而未执行的情况），则isDone（）为true；否则，为false。
+ * 如果任务没有取消就完成或遇到异常，则isCompletedNormally（）为true；
+ * 如果任务被取消，则isCancelled（）为true（在这种情况下，getException（）返回CancellationException）；
+ * 如果任务被取消或遇到异常，则isCompletedAbnormally（）为true，在这种情况下，getException（）将返回遇到的异常或CancellationException。
  *
- * <p>The ForkJoinTask class is not usually directly subclassed.
- * Instead, you subclass one of the abstract classes that support a
- * particular style of fork/join processing, typically {@link
- * RecursiveAction} for most computations that do not return results,
- * {@link RecursiveTask} for those that do, and {@link
- * CountedCompleter} for those in which completed actions trigger
- * other actions.  Normally, a concrete ForkJoinTask subclass declares
- * fields comprising its parameters, established in a constructor, and
- * then defines a {@code compute} method that somehow uses the control
- * methods supplied by this base class.
+ * ForkJoinTask类通常不直接子类化。
+ * 相反，你子类化一个抽象类，该抽象类支持一种特殊样式的fork/join处理，
+ * 对于大多数不返回结果的计算通常使用RecursiveAction，
+ * 对于那些返回结果的计算则通常使用RecursiveTask，
+ * 对于已完成的操作会触发其他操作的那些计算则使用CountedCompleter。
+ * 通常，具体的ForkJoinTask子类声明包含其参数类型的字段，该字段在构造函数中建立，然后定义一个计算方法，该方法以某种方式使用此基类提供的控制方法。
  *
- * <p>Method {@link #join} and its variants are appropriate for use
- * only when completion dependencies are acyclic; that is, the
- * parallel computation can be described as a directed acyclic graph
- * (DAG). Otherwise, executions may encounter a form of deadlock as
- * tasks cyclically wait for each other.  However, this framework
- * supports other methods and techniques (for example the use of
- * {@link Phaser}, {@link #helpQuiesce}, and {@link #complete}) that
- * may be of use in constructing custom subclasses for problems that
- * are not statically structured as DAGs. To support such usages, a
- * ForkJoinTask may be atomically <em>tagged</em> with a {@code short}
- * value using {@link #setForkJoinTaskTag} or {@link
- * #compareAndSetForkJoinTaskTag} and checked using {@link
- * #getForkJoinTaskTag}. The ForkJoinTask implementation does not use
- * these {@code protected} methods or tags for any purpose, but they
- * may be of use in the construction of specialized subclasses.  For
- * example, parallel graph traversals can use the supplied methods to
- * avoid revisiting nodes/tasks that have already been processed.
- * (Method names for tagging are bulky in part to encourage definition
- * of methods that reflect their usage patterns.)
+ * 方法join（）及其变体仅在完成依赖项为无环时才适用。
+ * 也就是说，并行计算可以描述为有向无环图（DAG）。
+ * 否则，执行可能会遇到死锁，因为任务会周期性地相互等待。
+ * 但是，此框架支持其他方法和技术（例如，使用Phaser，helpQuiesce（）和complete（V）），这些方法和技术可用于构造特定子类来解决非静态构造为DAG的问题。
+ * 为了支持这种用法，可以使用setForkJoinTaskTag（short）或compareAndSetForkJoinTaskTag（short，short）方法将ForkJoinTask自动标记一个short值，
+ * 并使用getForkJoinTaskTag（）方法对ForkJoinTask 进行检查。
+ * ForkJoinTask实现不出于任何目的使用这些受保护的方法或标记，但是它们可能在构造特定子类中使用。
+ * 例如，并行图遍历可以使用提供的方法来避免重新访问已处理的节点/任务。 （用于标记的方法名称很大一部分是为了鼓励定义反映其使用方式的方法。）
  *
- * <p>Most base support methods are {@code final}, to prevent
- * overriding of implementations that are intrinsically tied to the
- * underlying lightweight task scheduling framework.  Developers
- * creating new basic styles of fork/join processing should minimally
- * implement {@code protected} methods {@link #exec}, {@link
- * #setRawResult}, and {@link #getRawResult}, while also introducing
- * an abstract computational method that can be implemented in its
- * subclasses, possibly relying on other {@code protected} methods
- * provided by this class.
+ * 大多数基类支持方法都是final的，以防止覆盖与底层轻量级任务调度框架固定绑定的实现。
+ * 创建新的 fork/join 处理基本样式的开发人员应最少实现受保护的方法 exec(), setRawResult(V), and getRawResult()，同时还引入可以在其子类中实现的抽象计算方法，可能依赖于由此类提供其他受保护的方法。
  *
- * <p>ForkJoinTasks should perform relatively small amounts of
- * computation. Large tasks should be split into smaller subtasks,
- * usually via recursive decomposition. As a very rough rule of thumb,
- * a task should perform more than 100 and less than 10000 basic
- * computational steps, and should avoid indefinite looping. If tasks
- * are too big, then parallelism cannot improve throughput. If too
- * small, then memory and internal task maintenance overhead may
- * overwhelm processing.
+ * ForkJoinTasks应该执行相对少量的计算。
+ * 通常应通过递归分解，将大型任务拆分为较小的子任务。
+ * 作为非常粗略的经验法则，任务应执行100个以上且少于10000个基本计算步骤，并应避免无限循环。
+ * 如果任务太大，则并行性无法提高吞吐量。
+ * 如果太小，则内存和内部任务维护开销可能会使处理不堪重负。
  *
- * <p>This class provides {@code adapt} methods for {@link Runnable}
- * and {@link Callable}, that may be of use when mixing execution of
- * {@code ForkJoinTasks} with other kinds of tasks. When all tasks are
- * of this form, consider using a pool constructed in <em>asyncMode</em>.
+ * 此类提供了Runnable和Callable的适配方法，在将ForkJoinTasks与其他类型任务混合执行时可能会用到。
+ * 当所有任务都采用这种形式时，请考虑使用在asyncMode中构造的线程池。
  *
- * <p>ForkJoinTasks are {@code Serializable}, which enables them to be
- * used in extensions such as remote execution frameworks. It is
- * sensible to serialize tasks only before or after, but not during,
- * execution. Serialization is not relied on during execution itself.
+ * ForkJoinTasks是可序列化的，这使它们可以在诸如远程执行框架的扩展中使用。
+ * 仅在执行之前或之后而不是执行期间序列化任务是明智的。在执行过程中本身中不应该序列化。
  *
  * @author Doug Lea
  * @since 1.7
+ * todo 1 use case
  */
 public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
 
@@ -221,7 +138,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /*
      * The status field holds run control status bits packed into a
      * single int to minimize footprint and to ensure atomicity (via
-     * CAS).  Status is initially zero, and takes on nonnegative
+     * CAS).todo this is great!
+      * Status is initially zero, and takes on nonnegative
      * values until completed, upon which status (anded with
      * DONE_MASK) holds value NORMAL, CANCELLED, or EXCEPTIONAL. Tasks
      * undergoing blocking waits by other threads have the SIGNAL bit

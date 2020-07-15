@@ -14,6 +14,7 @@ package juc;
  *
  * 内存一致性影响：在将任务提交给CompletionService之前的线程中操作，happens-before于在该任务执行的操作，
  * 而该任务执行的操作又happens-before于相应的take（）成功返回之后的操作。
+ * todo 3
  */
 public interface CompletionService<V> {
     /**

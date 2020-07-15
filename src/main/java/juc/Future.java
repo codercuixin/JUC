@@ -93,6 +93,7 @@ package juc;
  * @since 1.5
  * @author Doug Lea
  * @param <V> The result type returned by this Future's {@code get} method
+ *  todo 0
  */
 public interface Future<V> {
 

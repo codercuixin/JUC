@@ -151,7 +151,7 @@ import java.util.*;
  * <p>This implementation rejects submitted tasks (that is, by throwing
  * {@link RejectedExecutionException}) only when the pool is shut down
  * or internal resources have been exhausted.
- *
+ * todo 1
  * @author Doug Lea
  * @since 1.7
  */

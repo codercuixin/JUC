@@ -38,24 +38,13 @@ import juc.*;
 import juc.locks.LockSupport;
 
 /**
- * A cancellable asynchronous computation.  This class provides a base
- * implementation of {@link Future}, with methods to start and cancel
- * a computation, query to see if the computation is complete, and
- * retrieve the result of the computation.  The result can only be
- * retrieved when the computation has completed; the {@code get}
- * methods will block if the computation has not yet completed.  Once
- * the computation has completed, the computation cannot be restarted
- * or cancelled (unless the computation is invoked using
- * {@link #runAndReset}).
+ * 一个可取消的异步计算。
+ *  此类提供Future的基本实现，其中包含启动和取消计算、查询以查看计算是否完成以及检索计算结果的方法。
+ *  只有在计算完成后才能检索结果； 如果计算尚未完成，则get方法将阻塞。 一旦计算完成，就不能重新启动或取消计算（除非使用runAndReset（）调用计算）。
+ * FutureTask可用于包装Callable或Runnable对象。
+ *  由于FutureTask实现了Runnable，因此FutureTask可以提交给Executor以执行。
  *
- * <p>A {@code FutureTask} can be used to wrap a {@link Callable} or
- * {@link Runnable} object.  Because {@code FutureTask} implements
- * {@code Runnable}, a {@code FutureTask} can be submitted to an
- * {@link Executor} for execution.
- *
- * <p>In addition to serving as a standalone class, this class provides
- * {@code protected} functionality that may be useful when creating
- * customized task classes.
+ * 除了用作独立类之外，此类还提供受保护的功能，这些功能在创建自定义任务类时可能会很有用。
  *
  * @since 1.5
  * @author Doug Lea

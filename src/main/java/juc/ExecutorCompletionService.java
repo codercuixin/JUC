@@ -100,6 +100,7 @@ package juc;
  *     if (result != null)
  *         use(result);
  * }}</pre>
+ * todo 3
  */
 public class ExecutorCompletionService<V> implements CompletionService<V> {
     private final Executor executor;
