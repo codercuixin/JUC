@@ -39,38 +39,25 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * An {@link Executor} that provides methods to manage termination and
- * methods that can produce a {@link Future} for tracking progress of
- * one or more asynchronous tasks.
+ * 一个Executor ，提供用于管理终止的方法和产生用于跟踪一个或多个异步任务进度的Future的方法。
  *
- * <p>An {@code ExecutorService} can be shut down, which will cause
- * it to reject new tasks.  Two different methods are provided for
- * shutting down an {@code ExecutorService}. The {@link #shutdown}
- * method will allow previously submitted tasks to execute before
- * terminating, while the {@link #shutdownNow} method prevents waiting
- * tasks from starting and attempts to stop currently executing tasks.
- * Upon termination, an executor has no tasks actively executing, no
- * tasks awaiting execution, and no new tasks can be submitted.  An
- * unused {@code ExecutorService} should be shut down to allow
- * reclamation of its resources.
+ * 一个ExecutorService可以被关闭，这将导致它拒绝新任务。
+ * 提供了两种不同的方法来关闭ExecutorService。
+ *  shutdown（）方法将允许终止之前执行先前提交的任务，
+ * 而shutdownNow（）方法可防止等待的任务启动并尝试停止当前正在执行的任务。
+ * 一旦终止，executor 将没有正在执行的任务，没有等待执行的任务，并且没有可以被提交的新任务。
+ * 应该关闭未使用的ExecutorService以便回收其资源。
  *
- * <p>Method {@code submit} extends base method {@link
- * Executor#execute(Runnable)} by creating and returning a {@link Future}
- * that can be used to cancel execution and/or wait for completion.
- * Methods {@code invokeAny} and {@code invokeAll} perform the most
- * commonly useful forms of bulk execution, executing a collection of
- * tasks and then waiting for at least one, or all, to
- * complete. (Class {@link ExecutorCompletionService} can be used to
- * write customized variants of these methods.)
+ * 方法 submit 通过创建并返回可以用于取消执行和/或等待完成的Future来扩展基本方法 Executor.execute（Runnable）。
+ * 方法invokeAny和invokeAll是批量执行的最常用形式，执行一组任务，并且然后等待至少一个或全部任务完成。
+ * （类ExecutorCompletionService可用于编写这些方法的自定义变体。）
  *
- * <p>The {@link Executors} class provides factory methods for the
- * executor services provided in this package.
+ * Executors类为此包中提供的Executor服务提供了工厂方法。
  *
- * <h3>Usage Examples</h3>
+ * <h3>使用样例</h3>
  * <p>
- * Here is a sketch of a network service in which threads in a thread
- * pool service incoming requests. It uses the preconfigured {@link
- * Executors#newFixedThreadPool} factory method:
+ * 这是网络服务的示意图，其中线程池中的线程服务到来的请求。
+ *  它使用预配置的Executors.newFixedThreadPool（int）工厂方法：
  *
  * <pre> {@code
  * class NetworkService implements Runnable {
@@ -102,9 +89,8 @@ import java.util.List;
  *   }
  * }}</pre>
  * <p>
- * The following method shuts down an {@code ExecutorService} in two phases,
- * first by calling {@code shutdown} to reject incoming tasks, and then
- * calling {@code shutdownNow}, if necessary, to cancel any lingering tasks:
+ * 以下方法分两个阶段关闭ExecutorService：
+ * 首先通过调用shutdown拒绝新到来的任务，然后在必要时调用shutdownNow来取消所有等待的任务：
  *
  * <pre> {@code
  * void shutdownAndAwaitTermination(ExecutorService pool) {
@@ -125,12 +111,9 @@ import java.util.List;
  *   }
  * }}</pre>
  *
- * <p>Memory consistency effects: Actions in a thread prior to the
- * submission of a {@code Runnable} or {@code Callable} task to an
- * {@code ExecutorService}
- * <a href="package-summary.html#MemoryVisibility"><i>happen-before</i></a>
- * any actions taken by that task, which in turn <i>happen-before</i> the
- * result is retrieved via {@code Future.get()}.
+ * <p>内存一致性影响：在将Runnable或Callable任务提交给ExecutorService之前的线程中操作，
+ * happen-before该任务执行的任何操作，
+ * 而该任务内的操作又happen-before通过Future.get（）获取到结果。
  *
  * @author Doug Lea
  * @since 1.5
