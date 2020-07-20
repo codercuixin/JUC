@@ -133,6 +133,14 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * (3) user-level methods that additionally report results.
      * This is sometimes hard to see because this file orders exported
      * methods in a way that flows well in javadocs.
+     *  有关一般的实现概述，请参见类ForkJoinPool的内部文档。
+      *  ForkJoinTasks在中继到ForkJoinWorkerThread和ForkJoinPool中的方法之间，主要负责维护其“status”字段。
+     *   此类的方法大致分为
+     *  （1）基本状态维护
+     *  （2）执行和等待完成
+     *  （3）用户级方法（另外报告结果）。 有时很难看到，因为此文件以在Javadocs中良好流动的方式对导出的方法进行排序。
+     *
+     *
      */
 
     /*
@@ -152,10 +160,20 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * thin-lock techniques, so use some odd coding idioms that tend
      * to avoid them, mainly by arranging that every synchronized
      * block performs a wait, notifyAll or both.
+     *  status字段将运行控制状态位打包为一个int，以最大程度地减少占用空间并确保原子性（通过CAS）。
+     *  status最初为零，并采用非负值，直到完成为止，此后（与DONE_MASK一起）状态的值保持为NORMAL，CANCELLED或EXCEPTIONAL。
+     *  其他线程正在等待阻塞的任务将SIGNAL位置1。
+     *  一个设置了SIGNAL集合的被盗任务完成后，将通过notifyAll唤醒任何等待者。
+     *  即使出于某些目的不是最优的，我们还是使用基本的内置等待/通知来利用JVM中的“监视器膨胀”，
+     *  否则我们将需要模拟JVM以避免增加每个任务的记录开销。
+     *  我们希望这些监视器是“胖”的，即，不使用偏置或细锁技术，因此要使用一些奇怪的编码习惯来避免它们，
+     *  主要是通过安排每个同步块执行一个wait，notifyAll或两者。
      *
      * These control bits occupy only (some of) the upper half (16
      * bits) of status field. The lower bits are used for user-defined
      * tags.
+     * 这些控制位仅占用status字段的(部分)上半部分（高16位）。
+     * 下半部分（低16位）用于用户定义的标签。
      */
 
     /**
@@ -194,6 +212,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * Primary execution method for stolen tasks. Unless done, calls
      * exec and records status if completed, but doesn't wait for
      * completion otherwise.
+     * 被盗任务的主要执行方法。
+     * 除非完成，否则调用exec并记录状态（如果完成），否则不等待完成。
      *
      * @return status on exit from this method
      */
@@ -430,6 +450,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * worker and pool shutdown. Cancel is spec'ed not to throw any
      * exceptions, but if it does anyway, we have no recourse during
      * shutdown, so guard against this case.
+     * 取消，忽略由取消引发的任何异常。
+     * 在工作线程和池关闭期间使用。
+     * 取消被指定为不引发任何异常，但是如果还是抛出了异常，我们在关闭过程中没有追索权，因此要避免这种情况。
+     *
+     *
      */
     static final void cancelIgnoringExceptions(juc.ForkJoinTask<?> t) {
         if (t != null && t.status >= 0) {
@@ -1159,7 +1184,10 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * exception to indicate abnormal exit. This method is designed to
      * support extensions, and should not in general be called
      * otherwise.
-     *
+     * 立即执行此任务的基本操作，如果从该方法返回后，保证此任务已正常完成，则返回true。
+     * 否则，此方法可能返回false，以指示此任务不一定是完成的（或不知道是完成的），例如在需要显式调用完成方法的异步操作中。
+     * 此方法还可能引发（未经检查的）异常以指示异常退出。
+     * 此方法旨在支持扩展，一般不应以其他方式调用。
      * @return {@code true} if this task is known to have completed normally
      */
     protected abstract boolean exec();
