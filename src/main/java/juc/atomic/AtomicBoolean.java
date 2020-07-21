@@ -35,6 +35,7 @@
 
 package juc.atomic;
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 /**
  * A {@code boolean} value that may be updated atomically. See the
@@ -50,7 +51,7 @@ import sun.misc.Unsafe;
 public class AtomicBoolean implements java.io.Serializable {
     private static final long serialVersionUID = 4654671469794556979L;
     // setup to use Unsafe.compareAndSwapInt for updates
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
     private static final long valueOffset;
 
     static {

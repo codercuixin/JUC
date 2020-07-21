@@ -36,6 +36,7 @@
 package juc.atomic;
 
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.function.LongBinaryOperator;
 import java.util.function.LongUnaryOperator;
@@ -57,7 +58,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 1927816293512124184L;
 
     // setup to use Unsafe.compareAndSwapLong for updates
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
     private static final long valueOffset;
 
     /**
@@ -65,8 +66,9 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * compareAndSwap for longs. While the Unsafe.compareAndSwapLong
      * method works in either case, some constructions should be
      * handled at Java level to avoid locking user-visible locks.
+     * //todo 这里直接改了
      */
-    static final boolean VM_SUPPORTS_LONG_CAS = VMSupportsCS8();
+    static final boolean VM_SUPPORTS_LONG_CAS = true;
 
     /**
      * Returns whether underlying JVM supports lockless CompareAndSet

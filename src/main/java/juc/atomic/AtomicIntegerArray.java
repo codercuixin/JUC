@@ -36,6 +36,7 @@
 package juc.atomic;
 
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.function.IntBinaryOperator;
 import java.util.function.IntUnaryOperator;
@@ -51,7 +52,7 @@ import java.util.function.IntUnaryOperator;
 public class AtomicIntegerArray implements java.io.Serializable {
     private static final long serialVersionUID = 2862133569453604235L;
 
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
     private static final int base = unsafe.arrayBaseOffset(int[].class);
     private static final int shift;
     private final int[] array;

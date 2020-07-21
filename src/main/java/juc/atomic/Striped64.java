@@ -35,6 +35,8 @@
 
 package juc.atomic;
 
+import unsafeTest.GetUnsafeFromReflect;
+
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.LongBinaryOperator;
@@ -130,7 +132,7 @@ abstract class Striped64 extends Number {
         private static final long valueOffset;
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
+                UNSAFE = GetUnsafeFromReflect.getUnsafe();
                 Class<?> ak = Cell.class;
                 valueOffset = UNSAFE.objectFieldOffset
                     (ak.getDeclaredField("value"));

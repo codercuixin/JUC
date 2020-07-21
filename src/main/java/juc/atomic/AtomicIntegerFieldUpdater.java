@@ -38,6 +38,7 @@ package juc.atomic;
 import sun.misc.Unsafe;
 import sun.reflect.CallerSensitive;
 import sun.reflect.Reflection;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -369,7 +370,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
      */
     private static class AtomicIntegerFieldUpdaterImpl<T>
             extends AtomicIntegerFieldUpdater<T> {
-        private static final Unsafe unsafe = Unsafe.getUnsafe();
+        private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
         private final long offset;
         private final Class<T> tclass;
         private final Class<?> cclass;

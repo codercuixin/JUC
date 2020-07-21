@@ -36,6 +36,7 @@
 package juc;
 
 import juc.atomic.AtomicLong;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.security.AccessControlContext;
@@ -1543,7 +1544,7 @@ public class ForkJoinPool extends AbstractExecutorService {
 
         static {
             try {
-                U = sun.misc.Unsafe.getUnsafe();
+                U = GetUnsafeFromReflect.getUnsafe();
                 Class<?> wk = WorkQueue.class;
                 Class<?> ak = ForkJoinTask[].class;
                 QTOP = U.objectFieldOffset
@@ -2407,11 +2408,12 @@ public class ForkJoinPool extends AbstractExecutorService {
 
     /**
      * Helps and/or blocks until the given task is done or timeout.
-     *
+     * 帮助和/或阻塞，直到完成给定任务或超时。
      * @param w        caller
      * @param task     the task
      * @param deadline for timed waits, if nonzero
      * @return task status on exit
+     * //todo 重点
      */
     final int awaitJoin(WorkQueue w, ForkJoinTask<?> task, long deadline) {
         int s = 0;
@@ -2708,6 +2710,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * submission of the first task to the pool.  It also detects
      * first submission by an external thread and creates a new shared
      * queue if the one at index if empty or contended.
+     * 完整版的externalPush，可处理不常见的情况，也可以处理在向池中首次提交第一个任务时执行辅助初始化。
+     * 它还检测外部线程的首次提交，如果索引处的WorkQueue为空或竞争，则创建新的共享的WorkQueue。
      *
      * @param task the task. Caller must ensure non-null.
      */
@@ -2748,7 +2752,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                 } finally {
                     unlockRunState(rs, (rs & ~RSLOCK) | ns);
                 }
-            } else if ((q = ws[k = r & m & SQMASK]) != null) {
+            } else if ((q = ws[k = r & m & SQMASK]) != null) {  //找到当前线程对应的WorkQueue
                 if (q.qlock == 0 && U.compareAndSwapInt(q, QLOCK, 0, 1)) {
                     ForkJoinTask<?>[] a = q.array;
                     int s = q.top;
@@ -2756,6 +2760,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                     try {                      // locked version of push
                         if ((a != null && a.length > s + 1 - q.base) ||
                                 (a = q.growArray()) != null) {
+                            //找到当前任务放置的内存地址，绝对内存地址（基址+偏移地址）
                             int j = (((a.length - 1) & s) << ASHIFT) + ABASE;
                             U.putOrderedObject(a, j, task);
                             U.putOrderedInt(q, QTOP, s + 1);
@@ -2765,12 +2770,13 @@ public class ForkJoinPool extends AbstractExecutorService {
                         U.compareAndSwapInt(q, QLOCK, 1, 0);
                     }
                     if (submitted) {
+                        //通知工作线程该干活了
                         signalWork(ws, q);
                         return;
                     }
                 }
                 move = true;                   // move on failure
-            } else if (((rs = runState) & RSLOCK) == 0) { // create new queue
+            } else if (((rs = runState) & RSLOCK) == 0) { // create new queue,如果上一步失败的话（即没有对应的WorkQueue）
                 q = new WorkQueue(this, null);
                 q.hint = r;
                 q.config = k | SHARED_QUEUE;
@@ -2792,6 +2798,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * submitter's current queue. Only the (vastly) most common path
      * is directly handled in this method, while screening for need
      * for externalSubmit.
+     * 尝试将给定任务添加到提交者当前队列的提交队列中。
+     * 在筛选是否需要externalSubmit的情况下，仅（最主要的）最常见的路径直接用此方法处理。
      *
      * @param task the task. Caller must ensure non-null.
      */
@@ -3008,6 +3016,9 @@ public class ForkJoinPool extends AbstractExecutorService {
      * using {@code ex.printStackTrace()}) of both the current thread
      * as well as the thread actually encountering the exception;
      * minimally only the latter.
+     * 执行给定的任务，完成后返回结果。
+     * 如果计算遇到未经检查的异常或错误，则将其作为该调用的结果重新抛出。
+     * 重新抛出的异常的行为与常规异常相同，但是在可能的情况下，它包含当前线程以及实际遇到该异常的线程的堆栈跟踪（正如使用ex.printStackTrace（）显示）。 最少会有后者的堆栈跟踪。
      *
      * @param task the task
      * @param <T>  the type of the task's result
@@ -3776,7 +3787,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     static {
         // initialize field offsets for CAS etc
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            U = GetUnsafeFromReflect.getUnsafe();
             Class<?> k = juc.ForkJoinPool.class;
             CTL = U.objectFieldOffset
                     (k.getDeclaredField("ctl"));
@@ -3828,6 +3839,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     /**
      * Creates and returns the common pool, respecting user settings
      * specified via system properties.
+     * 创建并返回公共池，并遵守通过系统属性指定的用户设置。
      */
     private static juc.ForkJoinPool makeCommonPool() {
         int parallelism = -1;

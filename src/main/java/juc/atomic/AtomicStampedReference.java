@@ -35,6 +35,8 @@
 
 package juc.atomic;
 
+import unsafeTest.GetUnsafeFromReflect;
+
 /**
  * An {@code AtomicStampedReference} maintains an object reference
  * along with an integer "stamp", that can be updated atomically.
@@ -190,7 +192,7 @@ public class AtomicStampedReference<V> {
 
     // Unsafe mechanics
 
-    private static final sun.misc.Unsafe UNSAFE = sun.misc.Unsafe.getUnsafe();
+    private static final sun.misc.Unsafe UNSAFE = GetUnsafeFromReflect.getUnsafe();
     private static final long pairOffset =
         objectFieldOffset(UNSAFE, "pair", AtomicStampedReference.class);
 

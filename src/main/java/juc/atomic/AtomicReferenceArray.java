@@ -36,6 +36,7 @@
 package juc.atomic;
 
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -62,7 +63,7 @@ public class AtomicReferenceArray<E> implements java.io.Serializable {
 
     static {
         try {
-            unsafe = Unsafe.getUnsafe();
+            unsafe = GetUnsafeFromReflect.getUnsafe();
             arrayFieldOffset = unsafe.objectFieldOffset
                 (AtomicReferenceArray.class.getDeclaredField("array"));
             base = unsafe.arrayBaseOffset(Object[].class);

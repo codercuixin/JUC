@@ -35,6 +35,8 @@
 
 package juc;
 
+import unsafeTest.GetUnsafeFromReflect;
+
 import java.security.AccessControlContext;
 import java.security.ProtectionDomain;
 
@@ -210,7 +212,7 @@ public class ForkJoinWorkerThread extends Thread {
 
     static {
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            U = GetUnsafeFromReflect.getUnsafe();
             Class<?> tk = Thread.class;
             THREADLOCALS = U.objectFieldOffset
                     (tk.getDeclaredField("threadLocals"));

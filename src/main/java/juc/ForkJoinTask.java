@@ -36,6 +36,7 @@
 package juc;
 
 import juc.locks.ReentrantLock;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.io.Serializable;
 import java.lang.ref.ReferenceQueue;
@@ -117,7 +118,6 @@ import java.util.RandomAccess;
  *
  * @author Doug Lea
  * @since 1.7
- * todo 1 use case
  */
 public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
 
@@ -256,6 +256,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
 
     /**
      * Blocks a non-worker-thread until completion.
+     * 阻塞非工作线程，直到完成。
      *
      * @return status upon completion
      */
@@ -317,6 +318,9 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * Implementation for join, get, quietlyJoin. Directly handles
      * only cases of already-completed, external wait, and
      * unfork+exec.  Others are relayed to ForkJoinPool.awaitJoin.
+     * join，get，quietlyJoin的实现。
+     * 仅直接处理已经完成、外部等待和unfork + exec的情况。
+     * 其他的则中继到ForkJoinPool.awaitJoin。
      *
      * @return status upon completion
      */
@@ -325,6 +329,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         Thread t;
         ForkJoinWorkerThread wt;
         ForkJoinPool.WorkQueue w;
+        //如果status<0,表示task已完成（NORMAL，CANCELLED或EXCEPTIONAL）
+
         return (s = status) < 0 ? s :
                 ((t = Thread.currentThread()) instanceof ForkJoinWorkerThread) ?
                         (w = (wt = (ForkJoinWorkerThread) t).workQueue).
@@ -642,6 +648,10 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * executing it unless preceded by a call to {@link #join} or
      * related methods, or a call to {@link #isDone} returning {@code
      * true}.
+     * 安排在当前任务正在运行的池中异步执行此任务（如果适用），如果不在inForkJoinPool（）中，则使用ForkJoinPool.commonPool（）。
+     * 尽管不一定要强制执行它，除非任务已完成并重新初始化，否则多次划分（forK）任务，这是使用错误。
+     * 此任务的状态或对其执行的任何数据的后续修改都不一定可由执行该线程的线程以外的任何线程一致地观察到，
+     * 除非在这之前对join（）或相关方法的调用,或对isDone（）的调用返回true 。
      *
      * @return {@code this}, to simplify usage
      */
@@ -662,6 +672,9 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * interrupts of the calling thread do <em>not</em> cause the
      * method to abruptly return by throwing {@code
      * InterruptedException}.
+     * 完成后返回计算结果。
+     * 此方法与get（）的不同之处在于，异常完成会导致RuntimeException或Error，而不是ExecutionException，
+     * 并且调用线程的中断不会导致该方法通过抛出InterruptedException突然返回。
      *
      * @return the computed result
      */
@@ -1523,7 +1536,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         exceptionTableRefQueue = new ReferenceQueue<Object>();
         exceptionTable = new ExceptionNode[EXCEPTION_MAP_CAPACITY];
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            U = GetUnsafeFromReflect.getUnsafe();
             Class<?> k = juc.ForkJoinTask.class;
             STATUS = U.objectFieldOffset
                     (k.getDeclaredField("status"));

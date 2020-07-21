@@ -41,9 +41,12 @@ package juc;
  * {@code Void} {@code ForkJoinTask}s. Because {@code null} is the
  * only valid value of type {@code Void}, methods such as {@code join}
  * always return {@code null} upon completion.
+ * 递归的无结果ForkJoinTask。 此类建立约定以将无结果的动作参数化为Void ForkJoinTasks。
+ * 因为null是Void类型的唯一有效值，所以诸如join之类的方法在完成时总是返回null。
  *
  * <p><b>Sample Usages.</b> Here is a simple but complete ForkJoin
  * sort that sorts a given {@code long[]} array:
+ * 用法示例。 这是一个简单但完整的ForkJoin排序，它对给定的long []数组进行排序：
  *
  * <pre> {@code
  * static class SortTask extends RecursiveAction {
@@ -79,6 +82,8 @@ package juc;
  * SortTask(anArray)} and invoking it in a ForkJoinPool.  As a more
  * concrete simple example, the following task increments each element
  * of an array:
+ * 然后，你可以通过创建新的SortTask（anArray）并在ForkJoinPool中调用它来对anArray进行排序。
+ * 作为一个更具体的简单示例，以下任务将增加数组中的每个元素：
  * <pre> {@code
  * class IncrementTask extends RecursiveAction {
  *   final long[] array; final int lo, hi;
@@ -109,6 +114,10 @@ package juc;
  * counterbalances potential excess partitioning by directly
  * performing leaf actions on unstolen tasks rather than further
  * subdividing.
+ * 下面的示例说明了一些改进和惯用语，它们可能会带来更好的性能：
+ * RecursiveActions不需要完全递归，只要它们保持基本的分而治之方法即可。
+ * 下面是一个类，通过仅将重复除法的右侧除以2，并用一系列下一个引用跟踪它们，对双精度数组每个元素的平方求和。
+ * 它使用基于方法getSurplusQueuedTaskCount的动态阈值，但通过直接对未窃取的任务执行叶操作而不是进一步细分来抵消潜在的多余分区。
  *
  * <pre> {@code
  * double sumOfSquares(ForkJoinPool pool, double[] array) {

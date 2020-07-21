@@ -68,6 +68,16 @@ package juc;
  * synchronization mechanisms, it may be useful to create further
  * abstract subclasses that maintain linkages, fields, and additional
  * support methods appropriate for a set of related usages.
+ * 一个ForkJoinTask，在被触发并且没有剩余的未决动作时，执行完成动作。
+ * 通常，在存在子任务停滞和阻塞的情况下，CountedCompleters比其他形式的ForkJoinTasks更健壮，但编程起来不那么直观。
+ * CountedCompleter的用法与其他基于完成的组件（例如CompletionHandler）相似，不同的是可能需要多个挂起的完成(completions )来触发onCompletion（CountedCompleter）上的完成动作，而不仅仅是一个。
+ * 除非以其他方式初始化，否则未决（pending）计数从零开始，但是可以使用setPendingCount(int), addToPendingCount(int), 和compareAndSetPendingCount(int, int) 方法进行（原子上）更改。
+ * 调用tryComplete（）时，如果未决的操作计数为非零，则将其递减；否则，执行完成操作，并且如果此完成程序本身具有完成程序，则使用其完成程序继续该过程。
+ * 与相关的同步组件（如“Phaser ”和“Semaphore”）一样，这些方法仅影响内部计数。
+ * 他们没有建立任何进一步的内部记录。特别是，未维护待处理任务的身份。
+ * 如下所示，你可以创建子类，在需要时确实记录一些或所有待执行的任务或其结果。
+ * 如下所示，还提供了支持特定完成遍历的工具方法。
+ * 但是，由于CountedCompleters仅提供基本的同步机制，因此创建进一步的抽象子类（维护链接，字段和适用于一组相关用法的其他支持方法）可能是有用的。
  *
  * <p>A concrete CountedCompleter class must define method {@link
  * #compute}, that should in most cases (as illustrated below), invoke
@@ -76,6 +86,8 @@ package juc;
  * to perform an action upon normal completion, and method
  * {@link #onExceptionalCompletion(Throwable, CountedCompleter)} to
  * perform an action upon any exception.
+ * 一个具体的CountedCompleter类必须定义方法compute（），该方法在大多数情况下（如下所示）应在返回之前调用一次tryComplete（）。
+ * 该类还可以选择重写onCompletion（CountedCompleter）方法以在正常完成时执行操作，并重写onExceptionalCompletion（Throwable，CountedCompleter）方法以在任何异常时执行操作。
  *
  * <p>CountedCompleters most often do not bear results, in which case
  * they are normally declared as {@code CountedCompleter<Void>}, and
@@ -88,6 +100,11 @@ package juc;
  * default plays no role in CountedCompleters.  It is possible, but
  * rarely applicable, to override this method to maintain other
  * objects or fields holding result data.
+ * CountedCompleter通常不携带结果，在这种情况下，它们通常被声明为CountedCompleter<Void>，并且将始终返回null作为结果值。
+ * 在其他情况下，应重写getRawResult（）方法以提供join（），invoke（）和相关方法的结果。
+ * 通常，此方法应返回CountedCompleter对象的字段值（或一个或多个字段的函数），该值在完成时将保存结果。
+ * 默认情况下，方法setRawResult（T）在CountedCompleters中不起作用。
+ * 有可能但很少适用，可以重写此方法来维护其他保存结果数据的对象或字段。
  *
  * <p>A CountedCompleter that does not itself have a completer (i.e.,
  * one for which {@link #getCompleter} returns {@code null}) can be
@@ -104,6 +121,12 @@ package juc;
  * not otherwise already completed. Similarly, cancelling an internal
  * CountedCompleter has only a local effect on that completer, so is
  * not often useful.
+ * 自己没有completer 的CountedCompleter（即getCompleter（）返回null的completer ）可以用作具有此添加功能的常规ForkJoinTask。
+ * 但是，任何具有另一个completer 的completer 仅充当其他计算的内部帮助者，因此它自己的任务状态（如ForkJoinTask.isDone（）之类的方法中所述）是任意的；
+ * 仅当显式调用 complete(T), ForkJoinTask.cancel(boolean), ForkJoinTask.completeExceptionally(Throwable) 或方法compute异常完成时，此状态才会更改。
+ * 一旦有任何出现异常的completion，如果存在completer 并且该completer 尚未完成，则可以将异常中继给任务的completer （及其completer ，依此类推）。
+ * 同样，取消内部CountedCompleter对该completer 仅具有局部影响，因此通常没有用。
+ *
  *
  * <p><b>Sample Usages.</b>
  *
@@ -121,6 +144,12 @@ package juc;
  * garbage collection.  Because CountedCompleters provide their own
  * continuations, other threads need not block waiting to perform
  * them.
+ * 并行递归分解。
+ * CountedCompleters可以被树状排队，该树类似于经常与RecursiveActions一起使用的树，尽管设置它们所涉及的构造通常会有所不同。
+ * 在这里，每个任务的completer 是其在计算树中的父项。
+ * 即使需要更多记录，但在将可能耗时的操作（无法进一步细分）应用于数组或集合的每个元素时，CountedCompleters可能是更好的选择；
+ * 特别是当某些元素与其他元素完成操作所需的时间明显不同时，这可能是由于固有的变化（例如I / O）或诸如垃圾回收之类的辅助作用所致。
+ * 因为CountedCompleters提供了自己的延续，所以其他线程不需要因等待执行它们而阻塞。
  *
  * <p>For example, here is an initial version of a class that uses
  * divide-by-two recursive decomposition to divide work into single
@@ -133,6 +162,10 @@ package juc;
  * implementation of method {@code onCompletion} is not overridden).
  * A static utility method sets up the base task and invokes it
  * (here, implicitly using the {@link ForkJoinPool#commonPool()}).
+ * 例如，这儿是该类的初始版本，该类使用“二分法”递归分解将工作划分为多个部分（叶任务）。
+ * 即使将工作分成多个单独的调用，基于树的技术通常也比直接分支叶任务更可取，因为它们减少了线程间的通信并改善了负载平衡。
+ * 在递归的情况下，每对子任务中的第二个要完成的任务触发其父对象的完成（因为未执行任何结果组合，因此不会覆盖方法onCompletion的默认无操作实现）。
+ * 静态实用程序方法设置并调用基本任务（这里 隐式地使用了ForkJoinPool.commonPool（））
  *
  * <pre> {@code
  * class MyOperation<E> { void apply(E e) { ... }  }

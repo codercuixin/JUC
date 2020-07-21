@@ -36,6 +36,7 @@
 package juc.atomic;
 
 import sun.misc.Unsafe;
+import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
@@ -51,7 +52,7 @@ import java.util.function.UnaryOperator;
 public class AtomicReference<V> implements java.io.Serializable {
     private static final long serialVersionUID = -1848883965231344442L;
 
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final Unsafe unsafe = GetUnsafeFromReflect.getUnsafe();
     private static final long valueOffset;
 
     static {
