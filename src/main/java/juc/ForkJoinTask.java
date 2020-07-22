@@ -190,6 +190,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Marks completion and wakes up threads waiting to join this
      * task.
+     * 标记完成并唤醒等待加入此任务的线程。
      *
      * @param completion one of NORMAL, CANCELLED, EXCEPTIONAL
      * @return completion status on exit
@@ -686,6 +687,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     }
 
     /**
+     * todo this
      * Commences performing this task, awaits its completion if
      * necessary, and returns its result, or throws an (unchecked)
      * {@code RuntimeException} or {@code Error} if the underlying

@@ -36,6 +36,7 @@
 package juc;
 
 
+import unsafeTest.GetUnsafeFromReflect;
 
 /**
  * A {@link ForkJoinTask} with a completion action performed when
@@ -201,6 +202,9 @@ package juc;
  * of tail recursion removal.)  Also, because the task returns upon
  * executing its left task (rather than falling through to invoke
  * {@code tryComplete}) the pending count is set to one:
+ * 可以注意到在递归情况下，该任务在派生其右任务后无需执行任何操作，因此可以在返回之前直接调用其左任务，从而改进此设计。
+ * （这类似于尾部递归移除。）
+ * 而且，由于任务是在执行其左任务时返回的（而不是失败地调用tryComplete），因此未决计数设置为1：
  *
  * <pre> {@code
  * class ForEach<E> ...
@@ -224,6 +228,10 @@ package juc;
  * and add a pending count for each fork.  Additionally, because no task
  * in this tree implements an {@link #onCompletion(CountedCompleter)} method,
  * {@code tryComplete()} can be replaced with {@link #propagateCompletion}.
+ * 作为进一步的改进，注意到左任务甚至不需要存在。
+ * 我们还可以使用原始任务进行迭代，并为每个fork添加一个未决计数，而不是创建一个新任务。
+ * 此外，由于该树中没有任务实现onCompletion（CountedCompleter）方法，
+ * 因此tryComplete（）可以替换为propertyCompletion（）。
  *
  * <pre> {@code
  * class ForEach<E> ...
@@ -246,6 +254,8 @@ package juc;
  * specializing classes for leaf steps, subdividing by say, four,
  * instead of two per iteration, and using an adaptive threshold
  * instead of always subdividing down to single elements.
+ * 此类的其他改进可能需要预先计算待处理的计数，以便可以在构造函数中建立它们，
+ * 对叶子步骤进行专门化的类，每次迭代由分为4个而不是两个，并且使用自适应阈值而不是始终划分为单个元素 。
  *
  * <p><b>Searching.</b> A tree of CountedCompleters can search for a
  * value or property in different parts of a data structure, and
@@ -258,6 +268,12 @@ package juc;
  * further processing.)  Illustrating again with an array using full
  * partitioning (again, in practice, leaf tasks will almost always
  * process more than one element):
+ * <p><b>Searching.</b>
+ * 一棵CountedCompleters树可以在数据结构的不同部分中搜索值或属性，并一旦找到后，可以在AtomicReference中报告结果。
+ * 其他人可以轮询结果以避免不必要的工作。
+ * （你可以另外取消其他任务，但是让他们注意到结果已经被设置了，然后跳过这一步，进行进一步的处理，这样通常更简单，更高效。）
+ * 再次使用数组使用完整分区进行说明（实际上，叶任务也是几乎总是处理多个元素）
+ *
  *
  * <pre> {@code
  * class Searcher<E> extends CountedCompleter<E> {
@@ -298,6 +314,8 @@ package juc;
  * conditional ({@code if (result.get() == null) tryComplete();})
  * because no further bookkeeping is required to manage completions
  * once the root task completes.
+ * 在此示例中，以及在其他任务中（这些任务除了compareAndSet共同的结果之外，没有其他效果）
+ * 可以将{@code tryComplete}的尾随无条件调用设为有条件的 ({@code if (result.get() == null) tryComplete();})，因为根任务完成后，无需再进行记录来管理完成情况。
  *
  * <p><b>Recording subtasks.</b> CountedCompleter tasks that combine
  * results of multiple subtasks usually need to access these results
@@ -310,6 +328,12 @@ package juc;
  * combining left and right results does not matter; ordered
  * reductions require explicit left/right designations.  Variants of
  * other streamlinings seen in the above examples may also apply.
+ * <p><b>Recording subtasks.</b> 。结合了多个子任务的结果的CountedCompleter任务通常需要在方法onCompletion（CountedCompleter）中访问这些结果。
+ * 如下面的类所示（执行简化的map-reduce形式，其中映射和归约均为E型），
+ * 在分而治之设计中实现此目的的一种方法是让每个子任务记录其兄弟，以便可以通过onCompletion方法进行访问。
+ * 这项技术适用于左右合并结果的顺序无关紧要的归约。
+ * 有序归约需要明确的左/右指定。
+ * 在以上示例中看到的其他精简版本也可能适用。
  *
  * <pre> {@code
  * class MyMapper<E> { E apply(E v) {  ...  } }
@@ -375,6 +399,14 @@ package juc;
  * a task and its subtasks. No additional synchronization is required
  * within this method to ensure thread safety of accesses to fields of
  * this task or other completed tasks.
+ * 在这里，onCompletion方法采用许多合并结果的完成设计所共有的形式。
+ * 在两个不同的上下文的一个里，其中未决计数为零或变为零， 此回调样式方法都会被每个任务触发一次：
+ * （1）由任务本身触发（如果在调用tryComplete时其未决计数为零），或者
+ * （2）由他的任何一个子任务触发，当这些子任务完成并将未决计数减为零时。
+ *      调用方参数区分大小写。通常，当调用者是{@code this}时，无需采取任何措施。
+ *      否则，调用者参数被用（通常通过强制转换）来提供要组合的值（和/或指向其他值的链接）。
+ *      假设正确使用未决计数，则onCompletion内部的操作会在任务及其子任务完成时发生（一次）。
+ *      在此方法内，不需要其他同步来确保对该任务或其他已完成任务的字段进行线程安全访问。
  *
  * <p><b>Completion Traversals</b>. If using {@code onCompletion} to
  * process completions is inapplicable or inconvenient, you can use
@@ -383,6 +415,10 @@ package juc;
  * splits out right-hand tasks in the form of the third ForEach
  * example, the completions must cooperatively reduce along
  * unexhausted subtask links, which can be done as follows:
+ * 完成遍历。
+ * 如果使用onCompletion来处理完成是不适用的或不便的话，则可以使用firstComplete（）和nextComplete（）方法创建自定义遍历。
+ * 例如，要定义仅以第三个ForEach示例的形式拆分right-hand任务的MapReducer，completions必须沿着未耗尽的子任务链接协作地归约，这可以按照以下步骤进行：
+ *
  *
  * <pre> {@code
  * class MapReducer<E> extends CountedCompleter<E> { // version 2
@@ -425,6 +461,8 @@ package juc;
  * forked, but instead serve as bits of plumbing in other designs;
  * including those in which the completion of one or more async tasks
  * triggers another async task. For example:
+ * 触发器。 有些CountedCompleters本身从不分派（forked），而是在其他设计中充当管道的一部分: 包括那些一个或多个异步任务会触发另一个异步任务的completion。
+ * 例如：
  *
  * <pre> {@code
  * class HeaderBuilder extends CountedCompleter<...> { ... }
@@ -495,6 +533,10 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * identity of the given caller argument. If not equal to {@code
      * this}, then it is typically a subtask that may contain results
      * (and/or links to other results) to combine.
+     * 在调用方法{@link #tryComplete} 且未决计数为零时，或在调用无条件方法{@link #complete}时，执行一个操作。
+     * 默认情况下，此方法不执行任何操作。
+     * 你可以通过检查给定调用方参数的身份来区分情况。
+     * 如果不相等{@code this}，则通常是一个子任务，该子任务可能包含要组合的结果（和/或指向其他结果的链接）。
      *
      * @param caller the task invoking this method (which may
      * be this task itself)
@@ -513,6 +555,10 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * completer is also completed exceptionally, with the same
      * exception as this completer.  The default implementation of
      * this method does nothing except return {@code true}.
+     * 当调用方法ForkJoinTask.completeExceptionally（Throwable）或方法compute（）引发异常，并且此任务尚未正常完成时，执行一个操作。
+     * 在进入此方法时，此任务ForkJoinTask.isCompletedAbnormally（）。
+     * 此方法的返回值控制进一步的传播：如果为true且此任务有一个尚未完成的completer，则该completer也会异常完成，带有与此completer相同的异常。
+     * 此方法的默认实现除了返回true以外不执行任何操作。
      *
      * @param ex the exception
      * @param caller the task invoking this method (which may
@@ -527,6 +573,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     /**
      * Returns the completer established in this task's constructor,
      * or {@code null} if none.
+     * 返回在此任务的构造函数中建立的completer；如果没有，则返回null。
      *
      * @return the completer
      */
@@ -536,7 +583,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
 
     /**
      * Returns the current pending count.
-     *
+     * 返回当前未决计数。
      * @return the current pending count
      */
     public final int getPendingCount() {
@@ -604,6 +651,9 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * otherwise invokes {@link #onCompletion(CountedCompleter)}
      * and then similarly tries to complete this task's completer,
      * if one exists, else marks this task as complete.
+     * 如果未决计数为非零，则减少计数；
+     * 否则（计数为0），调用{@link #onCompletion(CountedCompleter)}，
+     * 然后类似地尝试完成此任务的完成者（如果存在），否则将其标记为完成。
      */
     public final void tryComplete() {
         CountedCompleter<?> a = this, s = a;
@@ -628,11 +678,16 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * one exists, else marks this task as complete. This method may be
      * useful in cases where {@code onCompletion} should not, or need
      * not, be invoked for each completer in a computation.
+     * 与 {@link #tryComplete}等效，但不会沿完成路径调用{@link #onCompletion(CountedCompleter)}：
+     * 如果未决计数为非零，则减少该计数；
+     * 否则（未决计数为0），类似地尝试完成此任务的父completer（如果存在），否则将此任务标记为完成。
+     * 在不应或不需要为计算中的每个完成程序调用onCompletion的情况下，此方法可能很有用。
      */
     public final void propagateCompletion() {
         CountedCompleter<?> a = this, s = a;
         for (int c;;) {
             if ((c = a.pending) == 0) {
+//                a.onCompletion(s); 相比tryComplete，只少了这一句
                 if ((a = (s = a).completer) == null) {
                     s.quietlyComplete();
                     return;
@@ -653,12 +708,19 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * as complete; its value is meaningful only for classes
      * overriding {@code setRawResult}.  This method does not modify
      * the pending count.
+     * 不管未决计数如何，都调用 {@link #onCompletion(CountedCompleter)}，将此任务标记为已完成，
+     * 然后在此任务的父Completer（如果存在）上进一步触发{@link #tryComplete}。
+     * 在调用{@link #onCompletion(CountedCompleter)} 或将此任务标记为完成之前， 给定的rawResult被用作{@link #setRawResult}的参数：
+     * 它的值仅对覆盖setRawResult的类有意义。
+     * 此方法不会修改未决计数。
      *
      * <p>This method may be useful when forcing completion as soon as
      * any one (versus all) of several subtask results are obtained.
      * However, in the common (and recommended) case in which {@code
      * setRawResult} is not overridden, this effect can be obtained
      * more simply using {@code quietlyCompleteRoot();}.
+     * 一旦获得多个子任务结果中的任何一个（相对于全部），就强制完成时，这种情况下此方法可能会很有用。
+     * 但是，在不重写setRawResult的常见（推荐）情况下，此效果可以使用{@code quietlyCompleteRoot();}更简单地获得。
      *
      * @param rawResult the raw result
      */
@@ -676,6 +738,8 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * otherwise decrements its pending count and returns {@code
      * null}. This method is designed to be used with {@link
      * #nextComplete} in completion traversal loops.
+     * 如果此任务的未决计数为零，则返回此任务；否则，减少其暂挂计数并返回null。
+     * 此方法设计为在完成遍历循环中与nextComplete（）一起使用。
      *
      * @return this task, if pending count was zero, else {@code null}
      */
@@ -695,6 +759,10 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * pending count and returns {@code null}.  Otherwise, returns the
      * completer.  This method can be used as part of a completion
      * traversal loop for homogeneous task hierarchies:
+     * 如果此任务没有一个完成者，则调用{@link ForkJoinTask#quietlyComplete}并返回null。
+     * 或者，如果完成者的未决计数为非零，则减少该未决计数并返回null。
+     * 否则，返回完成者。
+     * 此方法可用作同类任务层次结构的完成遍历循环的一部分：
      *
      * <pre> {@code
      * for (CountedCompleter<?> c = firstComplete();
@@ -732,6 +800,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * If this task has not completed, attempts to process at most the
      * given number of other unprocessed tasks for which this task is
      * on the completion path, if any are known to exist.
+     * 如果此任务尚未完成，则尝试最多处理给定数量的此任务在完成路径上的其他未处理任务（如果已知存在）。
      *
      * @param maxTasks the maximum number of tasks to process.  If
      *                 less than or equal to zero, then no tasks are
@@ -740,6 +809,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     public final void helpComplete(int maxTasks) {
         Thread t; ForkJoinWorkerThread wt;
         if (maxTasks > 0 && status >= 0) {
+            //todo 重要
             if ((t = Thread.currentThread()) instanceof ForkJoinWorkerThread)
                 (wt = (ForkJoinWorkerThread)t).pool.
                     helpComplete(wt.workQueue, this, maxTasks);
@@ -761,6 +831,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
 
     /**
      * Implements execution conventions for CountedCompleters.
+     * 实现CountedCompleters的执行约定。
      */
     protected final boolean exec() {
         compute();
@@ -773,6 +844,8 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * actions, but in other cases should be overridden, almost
      * always to return a field or function of a field that
      * holds the result upon completion.
+     * 返回计算结果。
+     * 默认情况下，返回null，这适用于Void动作，但是在其他情况下，应该覆盖此方法，几乎总是返回一个字段或字段的函数，该字段或函数在完成时保存结果。
      *
      * @return the result of the computation
      */
@@ -784,6 +857,9 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * Overrides are not recommended. However, if this method is
      * overridden to update existing objects or fields, then it must
      * in general be defined to be thread-safe.
+     * 带有结果的CountedCompleters的方法可以选择用来帮助维护结果数据。
+     * 默认情况下，不执行任何操作。
+     * 不建议覆盖。 但是，如果重写此方法以更新现有的对象或字段，则通常必须将其定义为线程安全的。
      */
     protected void setRawResult(T t) { }
 
@@ -792,7 +868,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     private static final long PENDING;
     static {
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            U = GetUnsafeFromReflect.getUnsafe();
             PENDING = U.objectFieldOffset
                 (CountedCompleter.class.getDeclaredField("pending"));
         } catch (Exception e) {
