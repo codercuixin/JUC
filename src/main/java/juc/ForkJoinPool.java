@@ -409,10 +409,10 @@ public class ForkJoinPool extends AbstractExecutorService {
      * AtomicLong) is used when available (it too must be lazily
      * initialized; see externalSubmit).
      * 字段"runState"保存可锁定状态位（STARTED，STOP等），还保护对workQueues数组的更新。
-     * 当用作锁时，它通常仅保留几条指令（唯一的例外是一次性数组初始化和不常见的调整大小），因此几乎总是在经过短暂的旋转之后锁就可用。
+     * 当用作锁时，它通常仅需要几条指令（唯一的例外是一次性数组初始化和不常见的调整大小），因此几乎总是在经过短暂的旋转之后锁就可用。
      * 但为谨慎起见，在旋转后，方法awaitRunStateLock（仅在初始CAS失败时才调用），在（很少）需要时使用内置监视器上的等待/通知机制来阻塞。
      * 对于高度竞争的锁，这将是一个糟糕的主意，但是大多数池在旋转限制之后都没有竞争的情况下运行，因此，作为更保守的选择，它可以很好地工作。
-      * 如果我们没有内部对象可用作监视器，因此在可用时使用"stealCounter"（一个AtomicLong）（它也必须延迟初始化；请参阅externalSubmit）。
+      * 由于我们没有内部对象可用作监视器，在可用时使用"stealCounter"（一个AtomicLong）（它也必须延迟初始化；请参阅externalSubmit）。
      *
      * Usages of "runState" vs "ctl" interact in only one case:
      * deciding to add a worker thread (see tryAddWorker), in which
@@ -940,6 +940,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     /**
      * If there is a security manager, makes sure caller has
      * permission to modify threads.
+     * 如果有安全管理器，请确保调用者有权修改线程。
      */
     private static void checkPermission() {
         SecurityManager security = System.getSecurityManager();
@@ -954,10 +955,14 @@ public class ForkJoinPool extends AbstractExecutorService {
      * A {@code ForkJoinWorkerThreadFactory} must be defined and used
      * for {@code ForkJoinWorkerThread} subclasses that extend base
      * functionality or initialize threads with different contexts.
+     * 用于创建新的{@link ForkJoinWorkerThread}的工厂。
+     * {@code ForkJoinWorkerThreadFactory}必须被定义并且被{@code ForkJoinWorkerThread} 子类使用，
+     * 该{@code ForkJoinWorkerThread} 子类扩展基础功能或使用不同上下文初始化线程。
      */
     public interface ForkJoinWorkerThreadFactory {
         /**
          * Returns a new worker thread operating in the given pool.
+         * 返回在给定池中运行的新工作线程。
          *
          * @param pool the pool this thread works in
          * @return the new worker thread
@@ -969,6 +974,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     /**
      * Default ForkJoinWorkerThreadFactory implementation; creates a
      * new ForkJoinWorkerThread.
+     * 默认的ForkJoinWorkerThreadFactory实现； 创建一个新的ForkJoinWorkerThread。
      */
     static final class DefaultForkJoinWorkerThreadFactory
             implements ForkJoinWorkerThreadFactory {
@@ -1005,9 +1011,10 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     // Constants shared across ForkJoinPool and WorkQueue
+    //在ForkJoinPool和WorkQueue之间共享的常量
 
     // Bounds
-    static final int SMASK = 0xffff;        // short bits == max index
+    static final int SMASK = 0xffff;        // short bits == max index 最大的索引
     static final int MAX_CAP = 0x7fff;        // max #workers - 1
     static final int EVENMASK = 0xfffe;        // even short bits
     static final int SQMASK = 0x007e;        // max 64 (even) slots  0x007e=128, 128/2=64
@@ -1724,7 +1731,18 @@ public class ForkJoinPool extends AbstractExecutorService {
     private static final int SHUTDOWN = 1 << 31;
 
     // Instance fields
+    /**
+     * 字段"ctl"包含64位信息，这些信息用于原子地决定添加，取消激活，入队（在事件队列上），出队和/或重新激活工作线程。
+     * 为了实现这种打包，我们将最大并行度限制为 (1<<15)-1 （这远远超出正常工作范围），以允许id，counts及其取反（用于阈值化）装进16位子字段。
+     */
     volatile long ctl;                   // main pool control
+    /**
+     *字段"runState"保存可锁定状态位（STARTED，STOP等），还保护对workQueues数组的更新。
+     *  当用作锁时，它通常仅需要几条指令（唯一的例外是一次性数组初始化和不常见的调整大小），因此几乎总是在经过短暂的旋转之后锁就可用。
+     *  但为谨慎起见，在旋转后，方法awaitRunStateLock（仅在初始CAS失败时才调用），在（很少）需要时使用内置监视器上的等待/通知机制来阻塞。
+     *  对于高度竞争的锁，这将是一个糟糕的主意，但是大多数池在旋转限制之后都没有竞争的情况下运行，因此，作为更保守的选择，它可以很好地工作。
+     *  由于我们没有内部对象可用作监视器，在可用时使用"stealCounter"（一个AtomicLong）（它也必须延迟初始化；请参阅externalSubmit）。
+     */
     volatile int runState;               // lockable status
     final int config;                    // parallelism, mode
     int indexSeed;                       // to generate worker index
@@ -1750,9 +1768,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * 旋转和/或阻止，直到runstate锁定可用为止。 请参阅上面的说明。
      */
     private int awaitRunStateLock() {
+
         Object lock;
         boolean wasInterrupted = false;
         for (int spins = SPINS, r = 0, rs, ns; ; ) {
+            //如果未锁定，则CAS加锁
             if (((rs = runState) & RSLOCK) == 0) {
                 if (U.compareAndSwapInt(this, RUNSTATE, rs, ns = rs | RSLOCK)) {
                     if (wasInterrupted) {
@@ -1774,6 +1794,7 @@ public class ForkJoinPool extends AbstractExecutorService {
             } else if ((rs & STARTED) == 0 || (lock = stealCounter) == null)
                 Thread.yield();   // initialization race
             else if (U.compareAndSwapInt(this, RUNSTATE, rs, rs | RSIGNAL)) {
+                //使用stealCounter作为内置监视器上，并调用其等待/通知机制来阻塞
                 synchronized (lock) {
                     if ((runState & RSIGNAL) != 0) {
                         try {
@@ -1808,11 +1829,13 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     // Creating, registering and deregistering workers
+    //创建，注册和注销工作线程
 
     /**
      * Tries to construct and start one worker. Assumes that total
      * count has already been incremented as a reservation.  Invokes
      * deregisterWorker on any failure.
+     * 尝试构建并启动一名工作线程。 假定总计数已被作为预留增加。 失败时调用deregisterWorker。
      *
      * @return true if successful
      */
@@ -1883,11 +1906,11 @@ public class ForkJoinPool extends AbstractExecutorService {
             if ((ws = workQueues) != null && (n = ws.length) > 0) {
                 int s = indexSeed += SEED_INCREMENT;  // unlikely to collide
                 int m = n - 1;
-                i = ((s << 1) | 1) & m;               // odd-numbered indices
-                if (ws[i] != null) {                  // collision
-                    int probes = 0;                   // step by approx half n
+                i = ((s << 1) | 1) & m;               // odd-numbered indices，奇数索引
+                if (ws[i] != null) {                  // collision，冲突
+                    int probes = 0;                   // step by approx half n，步进约半个n
                     int step = (n <= 4) ? 2 : ((n >>> 1) & EVENMASK) + 2;
-                    while (ws[i = (i + step) & m] != null) {
+                    while (ws[i = (i + step) & m] != null) {   //解决冲突
                         if (++probes >= n) {
                             workQueues = ws = Arrays.copyOf(ws, n <<= 1);
                             m = n - 1;
@@ -1897,8 +1920,8 @@ public class ForkJoinPool extends AbstractExecutorService {
                 }
                 w.hint = s;                           // use as random seed
                 w.config = i | mode;
-                w.scanState = i;                      // publication fence
-                ws[i] = w;
+                w.scanState = i;                      // publication fence， 发布栅栏（由volatile语义提供）
+                ws[i] = w;  //放到workQueues中
             }
         } finally {
             unlockRunState(rs, rs & ~RSLOCK);
@@ -1912,6 +1935,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * to construct or start a worker.  Removes record of worker from
      * array, and adjusts counts. If pool is shutting down, tries to
      * complete termination.
+     * 从终止工作线程，以及在无法构造或启动工作线程时进行的最终回调。
+     * 从数组中删除工作线程的记录，并调整计数。 如果池正在关闭，则尝试完成终止。
      *
      * @param wt the worker thread, or null if construction failed
      * @param ex the exception causing failure, or null if none
@@ -1921,6 +1946,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         if (wt != null && (w = wt.workQueue) != null) {
             WorkQueue[] ws;                           // remove index from array
             int idx = w.config & SMASK;
+            //获取runState锁保护下面对workQueues的更新
             int rs = lockRunState();
             if ((ws = workQueues) != null && ws.length > idx && ws[idx] == w)
                 ws[idx] = null;
