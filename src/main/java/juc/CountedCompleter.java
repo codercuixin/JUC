@@ -484,7 +484,10 @@ import unsafeTest.GetUnsafeFromReflect;
 public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     private static final long serialVersionUID = 5232453752276485070L;
 
-    /** This task's completer, or null if none */
+    /**
+     * This task's completer, or null if none
+     * 指向父节点Completer，形成的是一棵树，先完成子节点，才能完成父节点。
+     * */
     final CountedCompleter<?> completer;
     /** The number of pending tasks until completion */
     volatile int pending;

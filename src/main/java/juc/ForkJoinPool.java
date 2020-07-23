@@ -45,55 +45,15 @@ import java.security.ProtectionDomain;
 import java.util.*;
 
 /**
- * 用于运行ForkJoinTasks的ExecutorService
- *  ForkJoinPool提供了来自非ForkJoinTask客户端提交的入口点，还提供了管理和监视操作的入口点。
- * ForkJoinPool与其他类型的ExecutorService的不同之处主要在于，它采用了工作窃取（work-stealing):
- * 池中的所有线程都试图查找并执行提交到池中的任务和/或由其他活动任务创建的任务（如果不存在任务，则最终阻塞，等待新任务的到来） 。
- * 当大多数任务产生其他子任务时（大多数ForkJoinTasks也是如此），以及从外部客户端向池中提交许多小任务时，这可以实现高效处理。
- * 特别是在构造函数中将asyncMode设置为true时，ForkJoinPools也可能适用于从未合并（joined）的事件风格任务。
  *
- * 一个静态的commonPool（）可用并且适用于大多数应用程序。
- * 任何未显式提交到指定池的ForkJoinTask都使用commonPool。
- * 使用公共池通常会减少资源使用（其中的线程在不使用期间被缓慢回收，并在后续使用时将被恢复）。
  *
- * 对于需要单独或自定义池的应用程序，可以使用给定的目标并行度级别来构建ForkJoinPool；默认情况下，该并行度等于可用处理器的数量。
- * 线程池尝试通过动态添加，暂停或恢复内部工作线程来维护足够的活动（或可用）线程，即使某些任务因等待加入其他任务而停滞不前。
- * 但是，面对阻塞的I / O或其他不受管理的同步，不能保证此类调整。
- * 嵌套的ForkJoinPool.ManagedBlocker接口可扩展所容纳的同步类型。
- *
- * 除了执行方法和生命周期控制方法之外，此类还提供状态检查方法（例如getStealCount（）），旨在帮助开发，调优和监视fork / join应用程序。
- * 同样，方法toString（）以方便的形式返回池状态的指示，以进行非正式监视。
- *
- * 与其他ExecutorService一样，下表总结了三种主要的任务执行方法。
- * 这些被设计为主要供尚未在当前池中进行fork/join计算的客户端使用。这些方法的主要形式接受ForkJoinTask的实例，但是重载形式还允许混合执行基于Runnable或Callable的活动。
- * 但是，已经在池中执行的任务通常应改用表中列出的内部计算形式，除非使用通常不联接（joined）的异步事件风格任务，在这种情况下，方法选择之间几乎没有区别。
- *
- * Summary of task execution methods
- * Call from non-fork/join clients	Call from within fork/join computations
- * Arrange async execution	execute(ForkJoinTask)	ForkJoinTask.fork()
- * Await and obtain result	invoke(ForkJoinTask)	ForkJoinTask.invoke()
- * Arrange exec and obtain Future	submit(ForkJoinTask)	ForkJoinTask.fork() (ForkJoinTasks are Futures)
- * The common pool is by default constructed with default parameters, but these may be controlled by setting three system properties:
- *
- * java.util.concurrent.ForkJoinPool.common.parallelism - the parallelism level, a non-negative integer
- * java.util.concurrent.ForkJoinPool.common.threadFactory - the class name of a ForkJoinPool.ForkJoinWorkerThreadFactory
- * java.util.concurrent.ForkJoinPool.common.exceptionHandler - the class name of a Thread.UncaughtExceptionHandler
- *
- * 如果存在SecurityManager且未指定工厂，则默认线程池将使用工厂提供未启用权限的线程。
- * 系统类加载器用于加载这些类。
- *  在建立这些设置时发生任何错误时，将使用默认参数。
- * 通过将parallelism属性设置为0和/或使用可能返回null的工厂，可以禁用或限制公共池中线程的使用。
- *  但是，这样做可能导致未执行（unjoined）的任务永远不会执行。
- *
- * 实现注意事项：此实现将正在运行的最大线程数限制为32767。
- * 尝试创建大于最大线程数的池会导致IllegalArgumentException。
- *
- * 仅当关闭池或内部资源用尽时，此实现才拒绝提交的任务（即，通过抛出RejectedExecutionException）。
  *
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
  * A {@code ForkJoinPool} provides the entry point for submissions
  * from non-{@code ForkJoinTask} clients, as well as management and
  * monitoring operations.
+ * 用于运行 {@link ForkJoinTask}s的ExecutorService
+ * ForkJoinPool提供了来自非ForkJoinTask客户端提交的入口点，还提供了管理和监视操作的入口点。
  *
  * <p>A {@code ForkJoinPool} differs from other kinds of {@link
  * ExecutorService} mainly by virtue of employing
@@ -106,6 +66,10 @@ import java.util.*;
  * when setting <em>asyncMode</em> to true in constructors, {@code
  * ForkJoinPool}s may also be appropriate for use with event-style
  * tasks that are never joined.
+ * ForkJoinPool与其他类型的ExecutorService的不同之处主要在于，它采用了工作窃取（work-stealing):
+ * 池中的所有线程都试图查找并执行提交到池中的任务和/或由其他活动任务创建的任务（如果不存在任务，则因等待新任务而最终阻塞） 。
+ * 当大多数任务产生其他子任务时（大多数ForkJoinTasks也是如此），以及从外部客户端向池中提交许多小任务时，这可以实现高效处理。
+ * 特别是在构造函数中将asyncMode设置为true时，ForkJoinPools也可能适用于从未合并（joined）的事件风格任务。
  *
  * <p>A static {@link #commonPool()} is available and appropriate for
  * most applications. The common pool is used by any ForkJoinTask that
@@ -113,6 +77,9 @@ import java.util.*;
  * pool normally reduces resource usage (its threads are slowly
  * reclaimed during periods of non-use, and reinstated upon subsequent
  * use).
+ * 一个静态的{@link #commonPool()} 可用并且适用于大多数应用程序。
+ * 任何未显式提交到指定池的ForkJoinTask都使用commonPool。
+ * 使用公共池通常会减少资源使用（其中的线程在不使用期间被缓慢回收，并在后续使用时将被恢复）。
  *
  * <p>For applications that require separate or custom pools, a {@code
  * ForkJoinPool} may be constructed with a given target parallelism
@@ -124,6 +91,10 @@ import java.util.*;
  * I/O or other unmanaged synchronization. The nested {@link
  * ManagedBlocker} interface enables extension of the kinds of
  * synchronization accommodated.
+ * 对于需要单独或自定义池的应用程序，可以使用给定的目标并行度级别来构建ForkJoinPool；默认情况下，该并行度等于可用处理器的数量。
+ * 线程池尝试通过动态添加，暂停或恢复内部工作线程来维护足够的活动（或可用）线程，即使某些任务因等待加入其他任务而停滞不前。
+ * 但是，面对阻塞的I/O或其他不受管理的同步，不能保证此类调整。
+ * 嵌套的ForkJoinPool.ManagedBlocker接口可扩展所容纳的同步类型。
  *
  * <p>In addition to execution and lifecycle control methods, this
  * class provides status check methods (for example
@@ -131,6 +102,8 @@ import java.util.*;
  * tuning, and monitoring fork/join applications. Also, method
  * {@link #toString} returns indications of pool state in a
  * convenient form for informal monitoring.
+ * 除了执行方法和生命周期控制方法之外，此类还提供状态检查方法（例如{@link #getStealCount}），旨在帮助开发，调优和监视fork/join应用程序。
+ * 同样，方法 {@link #toString}以方便的形式返回池状态的指示，以进行非正式监视。
  *
  * <p>As is the case with other ExecutorServices, there are three
  * main task execution methods summarized in the following table.
@@ -143,6 +116,11 @@ import java.util.*;
  * use the within-computation forms listed in the table unless using
  * async event-style tasks that are not usually joined, in which case
  * there is little difference among choice of methods.
+ * 与其他ExecutorService一样，下表总结了三种主要的任务执行方法。
+ * 这些被设计为主要供尚未在当前池中进行fork/join计算的客户端使用。
+ * 这些方法的主要形式接受ForkJoinTask的实例，但是重载形式还允许混合执行基于Runnable或Callable的活动。
+ * 但是，已经在池中执行的任务通常应改用表中列出的内部计算形式，除非使用通常不合并（joined）的异步事件风格任务，在这种情况下，方法选择之间几乎没有区别。
+ *
  * <p>
  * <table BORDER CELLPADDING=3 CELLSPACING=1>
  * <caption>Summary of task execution methods</caption>
@@ -171,6 +149,7 @@ import java.util.*;
  * <p>The common pool is by default constructed with default
  * parameters, but these may be controlled by setting three
  * {@linkplain System#getProperty system properties}:
+ * 默认情况下，公共池是使用默认参数构造的，但是可以通过设置三个系统属性来控制这些参数：
  * <ul>
  * <li>{@code juc.ForkJoinPool.common.parallelism}
  * - the parallelism level, a non-negative integer
@@ -188,15 +167,22 @@ import java.util.*;
  * the common pool by setting the parallelism property to zero, and/or
  * using a factory that may return {@code null}. However doing so may
  * cause unjoined tasks to never be executed.
+ * 如果存在SecurityManager且未指定工厂，则默认线程池将使用工厂提供未启用权限的线程。
+ * 系统类加载器用于加载这些类。
+ * 在建立这些设置时发生任何错误时，将使用默认参数。通过将parallelism属性设置为0和/或使用可能返回null的工厂，
+ * 可以禁用或限制公共池中线程的使用。但是，这样做可能导致未合并（unjoined）的任务永远不会执行。
  *
  * <p><b>Implementation notes</b>: This implementation restricts the
  * maximum number of running threads to 32767. Attempts to create
  * pools with greater than the maximum number result in
  * {@code IllegalArgumentException}.
+ * 实现注意事项：此实现将正在运行的最大线程数限制为32767。
+ * 尝试创建大于最大线程数的池会导致IllegalArgumentException。
  *
  * <p>This implementation rejects submitted tasks (that is, by throwing
  * {@link RejectedExecutionException}) only when the pool is shut down
  * or internal resources have been exhausted.
+ * 仅当关闭池或内部资源用尽时，此实现才拒绝提交的任务（即，通过抛出RejectedExecutionException）。
  *
  * @author Doug Lea
  * @since 1.7
@@ -222,13 +208,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * their main rationale and descriptions are presented here;
      * individual methods and nested classes contain only brief
      * comments about details.
-     * 实现概述
      * 该类及其嵌套类为一组工作线程提供主要功能和控制：
-     *
      * 来自非FJ(fork/join)线程的任务提交进入提交（submission）队列。
      * 工作线程获取这些任务，并且通常将它们拆分为其他工作线程可能窃取的子任务。
-     * 优先规则规定优先处理来自其自己的队列（LIFO或FIFO，取决于模式）的任务，然后处理其他队列中的随机FIFO窃取任务。
-     * 该框架最初是使用工作窃取（work-stealing）来作为支持树形并行性的工具。
+     * 优先规则给出处理来自他们自己的队列的任务优先级（是LIFO还是FIFO，取决于模式），然后处理其他队列中随机FIFO窃取的任务。
+     * <strong>该框架最初是使用工作窃取（work-stealing）来作为支持树形并行性的工具。<strong>
      * 随着时间的流逝，其可伸缩性优势导致了扩展和更改，以更好地支持更多不同的使用上下文。
      * 由于大多数内部方法和嵌套类是相互关联的，因此此处介绍了它们的主要原理和描述。
      * 单个方法和嵌套类仅包含有关详细信息的简短注释。
@@ -257,32 +241,25 @@ public class ForkJoinPool extends AbstractExecutorService {
      * numbers of tasks. To accomplish this, we shift the CAS
      * arbitrating pop vs poll (steal) from being on the indices
      * ("base" and "top") to the slots themselves.
+     * <strong>大多数操作发生在工作窃取队列中（在嵌套类WorkQueue中）。</strong>
+     * 这些是Deques的特殊形式，仅支持四种可能的最终操作中的三种——push, pop, 和 poll（又名steal），
+     * 在进一步的约束下，push 和 pop 仅从拥有线程（或，正如这里扩展的，处于锁定状态），而 poll 可以从其他线程调用。
+     * （如果你不熟悉它们，则可能在继续之前先阅读Herlihy和Shavit的书“多处理器编程的艺术”，第16章对此进行了更详细的描述）。
+     * 主要的工作窃取队列设计大致与论文，"Dynamic Circular Work-Stealing Deque" by Chase and Lev, SPAA 2005  (http://research.sun.com/scalable/pubs/index.html)
+     * 和"Idempotent work stealing" by Michael, Saraswat, and Vechev,  PPoPP 2009 (http://portal.acm.org/citation.cfm?id=1504186) 中的类似。
+     * 主要区别最终源于GC的要求，该要求是即使在生成大量任务的程序中，我们也要尽快清空已占用的插槽，以尽可能减小占用空间。
+     * 为了实现这一点，我们将CAS仲裁 pop vs poll（steal）从位于索引("base" 和"top") 上移至slots本身。
      *
      * Adding tasks then takes the form of a classic array push(task):
+     * 添加任务然后采用经典数组 push(task) 的形式：
      *    q.array[q.top] = task; ++q.top;
      *
      * (The actual code needs to null-check and size-check the array,
      * properly fence the accesses, and possibly signal waiting
      * workers to start scanning -- see below.)  Both a successful pop
      * and poll mainly entail a CAS of a slot from non-null to null.
-     *
-     *  WorkQueues
-     *  ==========
-     *
-     * 大多数操作发生在工作窃取队列中（在嵌套类WorkQueue中）。
-     * 这些是Deques的特殊形式，仅支持四种可能的最终操作中的三种-push,   pop, and poll（又名steal），
-     * 在进一步的约束下，push 和 pop 仅从拥有线程（或正如这里扩展的，处于锁定状态），而 poll 可以从其他线程调用。
-      * （如果你不熟悉它们，则可能在继续之前先阅读Herlihy和Shavit的书“多处理器编程的艺术”，第16章对此进行了更详细的描述）。
-     * 主要的工作窃取队列设计大致与论文， todo 工作窃取队列
-     * "Dynamic         Circular Work-Stealing Deque" by Chase and Lev, SPAA 2005         (http://research.sun.com/scalable/pubs/index.html)
-     * 和"Idempotent work stealing" by Michael, Saraswat, and Vechev,      PPoPP 2009 (http://portal.acm.org/citation.cfm?id=1504186) 中的类似。
-     * 最终的主要区别在于GC的要求，即即使在生成大量任务的程序中，我们也要尽快清空已占用的插槽，以尽可能减小占用空间。
-     * 为了实现这一点，我们将CAS仲裁 pop vs poll（steal）从位于索引（“base”和“top”）上移至slots本身。
-     *
-     * 然后，添加任务采用经典数组push（task）的形式：
-     * q.array[q.top] = task; ++q.top;
-     *
-     * （实际代码需要对数组进行空检查和大小检查，适当地隔离访问，并可能通知等待的工作线程开始扫描-见下文。）
+     * （实际代码需要对数组进行空检查和大小检查，
+     * 适当地隔离访问，并可能通知等待的工作线程开始扫描-见下文。）
      * 成功的pop和poll都主要需要使用CAS将一个slot从非-null设置为null。
      *
      * The pop operation (always performed by owner) is:
@@ -320,13 +297,13 @@ public class ForkJoinPool extends AbstractExecutorService {
      * retries.)
      *  因为我们依CAS操作引用，所以不需要在base或tops上标记比特位。
      *  它们是在任何基于循环的圆形队列中使用的简单整数（例子可参见ArrayDeque）。
-     *  对索引的更新可确保top == base表示队列为空，但如果push, pop, 或poll没有完全提交，则可能使队列显得非空，这可能会出错。 （方法isEmpty（）检查部分删除最后一个元素的情况。）
-     *  因此，被单独考虑的poll操作并非没有等待。
+     *  对索引的更新可确保top == base表示队列为空，但如果push, pop, 或poll没有完全提交的时候，则可能使队列显得非空，这可能会出错。
+      *  （方法isEmpty（）检查部分删除最后一个元素的情况。）
+     *  因此，被单独考虑的poll操作并非没有等待（wait-free）。
      *  一个小偷不能成功地继续下去，直到另一个正在进行的操作（或者，如果以前是空的，一次push）完成。
-     *  但是，总的来说，我们至少确保了概率性的非阻塞性。
-     *  如果尝试的窃取失败，小偷总是会选择另一个随机的受害目标，然后再尝试。
+     *  但是，总的来说，我们至少确保了概率性的非阻塞性。 如果尝试的窃取失败，小偷总是会选择另一个随机的受害目标，然后再尝试。
      *  因此，为了使一个小偷前进，该小偷等待对任何空队列的进行中的poll或新的push操作的完成。
-     *  （这就是为什么我们通常使用方法pollAt及其变体在明显的base 索引处尝试一次，否则考虑替代操作，而不是重试的方法poll。）
+     *  （这就是为什么我们通常使用方法 pollAt 及其变体在明显的 base 索引处尝试一次，否则考虑替代操作，而不是重试的方法poll。）
      *
      * This approach also enables support of a user mode in which
      * local task processing is in FIFO, not LIFO order, simply by
@@ -345,9 +322,10 @@ public class ForkJoinPool extends AbstractExecutorService {
      * randomization of sufficient quality is used whenever
      * applicable.  Various Marsaglia XorShifts (some with different
      * shift constants) are inlined at use points.
-     *  这种方法还支持用户模式，其中本地任务处理按FIFO顺序（而不是LIFO顺序）进行，只需使用poll 而不是pop即可。
-     *  这在永不合并(join)任务的消息传递框架中很有用。
-     *  但是，这两种模式都没有考虑亲和力，负载，缓存位置等，因此很少在给定的计算机上提供最佳性能，而是通过对这些因素进行平均来可移植地提供良好的吞吐量。
+     *  <strong>这种方法还支持用户模式，其中本地任务处理按FIFO顺序（而不是LIFO顺序）进行，只需使用poll 而不是pop即可<strong>。
+     *  这在永不合并(join)任务的消息传递框架中很有用。(注：因为没有父任务依赖子任务的情况)
+     *  但是，这两种模式都没有考虑亲和力，负载，缓存位置等，因此很少在给定的计算机上可以提供最佳性能，
+     *  而是通过对这些因素进行平均来可移植地提供良好的吞吐量。
      *  此外，即使我们确实尝试使用此类信息，我们通常也没有利用它的基础。
      *  例如，某些任务集从高速缓存亲和力中获利，而另一些任务则受高速缓存污染效应的损害。
      *  此外，即使需要扫描，使用随机选择而不是有向选择策略，这样长期吞吐量通常最好，因此在适用时会使用便宜且质量足够高的随机化方法。
@@ -373,11 +351,12 @@ public class ForkJoinPool extends AbstractExecutorService {
      * cases, but uses CAS in unsuccessful cases.
      *  WorkQueue也以类似的方式用于提交到池的任务。
      *  我们不能将这些任务混合在工作线程使用的相同队列中。
-     *  相反，我们使用哈希形式将提交队列与提交线程随机关联。 ThreadLocalRandom探针值用作选择现有队列的哈希码，并且可以在与其他提交者争用时随机重新定位。
-     *  从本质上讲，提交者的行为类似于工作线程，只是他们只能执行提交的本地任务（或者在CountedCompleters的情况下，其他任务具有相同的根任务）。
+     *  相反，我们使用某种形式的哈希将提交队列与提交线程随机关联。
+     *  ThreadLocalRandom探针值用作选择现有队列的哈希码，并且可以在与其他提交者争用时随机重新定位。
+     *  从本质上讲，提交者的行为类似于工作线程，只是他们只能执行自己提交的本地任务（或者在CountedCompleters的情况下，其他任务具有相同的根任务）。
      *  在共享模式下插入任务需要一个锁（主要是在调整大小（resize）的情况下进行保护），
-     *  但是我们仅使用简单的自旋锁（使用字段qlock），因为遇到繁忙队列的提交者会继续尝试或创建其他队列--他们仅在创建和注册新队列时阻塞。
-     *  此外，“ qlock”在关闭时会饱和到可解锁的值（-1）。
+     *  但是我们仅使用简单的自旋锁（使用字段qlock），因为遇到繁忙队列的提交者会继续尝试或创建其他队列——他们仅在创建和注册新队列时阻塞。
+     *  此外，字段"qlock" 在关闭时会饱和到可解锁的值（-1）。
      *  在成功的情况下，仍可以通过更便宜的有序写入“ qlock”来执行解锁，但是在不成功的情况下使用CAS。
      *
      *
@@ -397,10 +376,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * volatile variables that are by far most often read (not
      * written) as status and consistency checks. (Also, field
      * "config" holds unchanging configuration state.)
-     *  工作窃取的主要吞吐量优势来自分散的控制——工作线程通常以每秒超过十亿的速度从自己或彼此执行任务。
-     *  线程池本身可以创建，激活（启用扫描和运行任务），停用，阻塞和终止线程，而这些操作只需很少的中央信息即可。
-     *  我们只能全局跟踪或维护一些属性，因此我们将它们打包到少量变量中，通常无需阻塞或锁定就可原子地维护这些变量。
-     *  几乎所有基本的原子控制状态都保存在两个volatile变量中，这两个变量经常被读取（而不是写入）作为状态和一致性检查。 （此外，字段“ config”保持不变的配置状态。）
+     *  工作窃取的主要吞吐量优势来自去中心化的控制——工作线程通常以每秒超过十亿的速度从自己或彼此获取任务。
+     *  线程池本身可以创建，激活（启用扫描和运行任务），停用，阻塞和终止线程，而这些操作只需很少的中心信息即可。
+     *  <strong>我们只能全局跟踪或维护一些属性，因此我们将它们包装到少量变量中，该少量变量通常无需阻塞或锁定就可原子地维护</strong>。
+     *  几乎所有基本的原子控制状态都保存在两个volatile变量中，这两个变量经常被作为状态和一致性检查读取（而不是写入）。
+      *  （此外，字段"config" 保持不变的配置状态。）
      * 
      *
      * Field "ctl" contains 64 bits holding information needed to
@@ -410,8 +390,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * far in excess of normal operating range) to allow ids, counts,
      * and their negations (used for thresholding) to fit into 16bit
      * subfields.
-     * 字段“ ctl”包含64位信息，这些信息用于原子地决定添加，取消激活，入队（在事件队列上），出队和/或重新激活工作线程。
-     * 为了实现这种打包，我们将最大并行度限制为（1 << 15）-1（远远超出正常工作范围），以允许id，counts及其取反（用于阈值化）装进16位子字段。
+     * 字段"ctl"包含64位信息，这些信息用于原子地决定添加，取消激活，入队（在事件队列上），出队和/或重新激活工作线程。
+     * 为了实现这种打包，我们将最大并行度限制为 (1<<15)-1 （这远远超出正常工作范围），以允许id，counts及其取反（用于阈值化）装进16位子字段。
      *
      * Field "runState" holds lockable state bits (STARTED, STOP, etc)
      * also protecting updates to the workQueues array.  When used as
@@ -428,15 +408,17 @@ public class ForkJoinPool extends AbstractExecutorService {
      * internal Object to use as a monitor, the "stealCounter" (an
      * AtomicLong) is used when available (it too must be lazily
      * initialized; see externalSubmit).
-     * 字段“ runState”保存可锁定状态位（STARTED，STOP等），还保护对workQueues数组的更新。
-     * 当用作锁时，它通常仅保留几条指令（唯一的例外是一次性数组初始化和不常见的调整大小resizing），因此几乎总是在经过短暂的旋转之后锁就可用。
+     * 字段"runState"保存可锁定状态位（STARTED，STOP等），还保护对workQueues数组的更新。
+     * 当用作锁时，它通常仅保留几条指令（唯一的例外是一次性数组初始化和不常见的调整大小），因此几乎总是在经过短暂的旋转之后锁就可用。
      * 但为谨慎起见，在旋转后，方法awaitRunStateLock（仅在初始CAS失败时才调用），在（很少）需要时使用内置监视器上的等待/通知机制来阻塞。
-     *
+     * 对于高度竞争的锁，这将是一个糟糕的主意，但是大多数池在旋转限制之后都没有竞争的情况下运行，因此，作为更保守的选择，它可以很好地工作。
+      * 如果我们没有内部对象可用作监视器，因此在可用时使用"stealCounter"（一个AtomicLong）（它也必须延迟初始化；请参阅externalSubmit）。
      *
      * Usages of "runState" vs "ctl" interact in only one case:
      * deciding to add a worker thread (see tryAddWorker), in which
      * case the ctl CAS is performed while the lock is held.
-     * “ runState”和“ ctl”的用法仅在一种情况下交互：决定添加一个工作线程（请参阅tryAddWorker），在这种情况下，ctl CAS是在持有锁的同时执行的。
+     *  "runState" vs "ctl" 的用法仅在一种情况下交互：
+     *  决定添加一个工作线程（请参阅tryAddWorker），在这种情况下，ctl CAS是在持有锁的同时执行的。
      *
      * Recording WorkQueues.  WorkQueues are recorded in the
      * "workQueues" array. The array is created upon first use (see
@@ -454,11 +436,10 @@ public class ForkJoinPool extends AbstractExecutorService {
      * simplifies and speeds up task scanning.
      * 记录工作队列。工作队列记录在“workQueues”数组中。
      * 该数组在首次使用时创建（请参阅externalSubmit），并在必要时进行扩大。
-     * 在记录新工作线程和取消记录终止的工作线程时，对数组的更新受到runState锁的保护，但数组并发可读，并且可以直接访问该数组。
-     * 我们还确保对数组引用本身的读取永远不会过时。
+     * 在记录新工作线程和取消记录终止的工作线程时，对数组的更新受到runState锁的保护，但数组并发可读，并且可以被直接访问。
+     * 我们还确保对数组引用本身的读取永远不会太过时。
      * 为了简化基于索引的操作，数组大小始终是2的幂，并且所有读取者都必须允许空插槽。
-     * 工作线程队列处在奇数索引处。
-     * 共享（提交）队列的索引为偶数，最多64个插槽，以限制增长，即使数组需要扩展以添加更多工作线程也是如此。
+     * <strong>工作线程队列处在奇数索引处。共享（提交）队列的索引为偶数，最多64个插槽，以限制增长，即使数组需要扩展以添加更多工作线程也是如此。</strong>
      * 以这种方式将它们分组在一起可以简化并加快任务扫描。
      *
      * All worker thread creation is on-demand, triggered by task
@@ -488,7 +469,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      * possible.
      * 排队空闲工作线程。
      * 与HPC工作窃取框架不同，当无法立即发现任何任务时，我们不能让工作线程无限旋转以扫描任务，并且除非有可用任务，否则我们无法启动/继续工作线程。
-     * 另一方面，在提交或生成新任务时，我们必须迅速使那些工作线程生效。
+     * 另一方面，在提交或生成新任务时，我们必须迅速促使那些工作线程作出反应。
      * 在许多情况下，激活工作线程的启动时间是整体性能的主要限制因素，这在程序启动时，通过JIT编译和分配会更加复杂。
      * 因此，我们尽可能地简化了这一过程。
      *
@@ -509,13 +490,13 @@ public class ForkJoinPool extends AbstractExecutorService {
      * worker: its index and status, plus a version counter that, in
      * addition to the count subfields (also serving as version
      * stamps) provide protection against Treiber stack ABA effects.
-     * “ ctl”字段原子上维护活动和总工作线程计数，以及用于放置等待线程的队列，以便这些等待线程可以被定位并通知。
+     * <strong>"ctl" 字段原子上维护活动和总工作线程计数，以及用于放置等待线程的队列，以便这些等待线程可以被定位并通知。</strong>
      * 活动工作线程计数也起着静态指标的作用，因此当工作线程认为没有更多要执行的任务时，活动工作线程计数就会减少。
-     * 字段 “queue”实际上是Treiber堆栈的一种形式。
+     * 字段"queue"实际上是Treiber堆栈的一种形式。(Treiber堆栈,请参见https://en.wikipedia.org/wiki/Treiber_stack)
      * 该堆栈是按最近使用的顺序激活线程的理想选择。
      * 这改善了性能和局部性，克服了易于争用和无法释放工作线程（除非其位于堆栈的最顶部）的缺点。
      * 当工作线程找不到任务时，我们在闲置的工作线程堆栈（由ctl的较低的32位子字段表示）上入栈后，park/unpark 这些工作线程。
-     * 顶部堆栈状态保存工作线程的“ scanState”字段的值：其索引和状态，以及一个版本计数器，该计数器除了count子字段（还用作版本标记）之外，还可以防止Treiber堆栈ABA的影响。
+     * 顶部堆栈状态保存工作线程的"scanState" 字段的值：其索引和状态，以及一个版本计数器，该计数器除了count子字段（还用作版本标记）之外，还可以防止Treiber堆栈ABA的影响。
      *
      * 
      * Field scanState is used by both workers and the pool to manage
@@ -529,7 +510,9 @@ public class ForkJoinPool extends AbstractExecutorService {
      * scanState must hold its pool index. So we place the index there
      * upon initialization (see registerWorker) and otherwise keep it
      * there or restore it when necessary.
-     * 当工作线程处于非激活状态时，将设置其scanState字段，并阻止其执行任务，即使该工作线程必须扫描一次任务以排队竞争。
+     * 工作线程和池都使用字段scanState来管理和跟踪是一个工作线程不活动的（INACTIVE，可能是因等待一个信号而阻塞），
+     * 还是一个工作线程正对任务进行扫描（SCANNING，当两个都不持有它，它正在忙于运行任务）。？
+     * 当工作线程处于非激活状态时，将设置其scanState字段，并阻止其执行任务，即使该工作线程必须扫描一次任务以避免排队竞争。
      * 请注意，scanState更新CAS释放的延迟队列，因此使用时需要注意。
      * 排队时，scanState的低16位必须保留其线程池索引。
      * 因此，我们在初始化时将索引放置在那里（请参见registerWorker），否则保留索引在那里或在必要时将索引还原。
@@ -559,13 +542,13 @@ public class ForkJoinPool extends AbstractExecutorService {
      * 内存排序。请参阅Le，Pop，Cohen和Nardelli在PPoPP 2013（(http://www.di.ens.fr/~zappa/readings/ppopp13.pdf)上
      * 发表的“Correct and Efficient Work-Stealing for  Weak Memory Models”，
      * 以分析类似于此处使用的工作窃取算法中的内存排序要求。
-     * 我们通常需要比最小顺序更强的命令，因为有时我们必须向工作线程发出信号，要求像Dekker一样的全栅栏（full-fence)以避免信号丢失。
-     * 要安排足够的顺序而又不花费过多的费用，则需要在表示访问限制的支持方法之间进行权衡。
-     * 最重要的操作是从队列中获取并更新ctl状态，这需要full-fence的CAS。使用Unsafe提供的易失性仿真读取阵列插槽。
+     * 我们通常需要比最小顺序更强的排序，因为有时我们必须向工作线程发出信号，要求像Dekker-like的full-fence以避免信号丢失。
+     * 要安排足够的排序而又不花费过多的费用，则需要在表示访问限制的支持方法之间进行权衡。
+     * 最重要的操作是从队列中获取并更新ctl状态，这需要full-fence的CAS。使用Unsafe提供的易失性仿真读取数组插槽。
      * 从其他线程访问WorkQueue base，top 和数组需要对这些读取中的任何一个进行易失性加载。
      * 我们使用声明“base”索引为volatile的约定，并始终在其他字段之前读取它。
      * 所有者线程必须确保有序的更新，因此写操作将使用有序的内部函数，除非它们可以背负其他写操作。
-     * 其他WorkQueue字段（例如“ currentSteal”）也具有类似的约定和原理，这些字段仅由所有者写但被其他人观察。
+     * 其他WorkQueue字段（例如 "currentSteal"）也具有类似的约定和原理，这些字段仅由所有者写但被其他人观察。
      * 
      * Creating workers. To create a worker, we pre-increment total
      * count (serving as a reservation), and attempt to construct a
@@ -588,12 +571,15 @@ public class ForkJoinPool extends AbstractExecutorService {
      * ThreadLocalRandom.getProbe() for similar purposes here because
      * the thread has not started yet, but do so for creating
      * submission queues for existing external threads.
-     * 创造工作线程。要创建一个工作线程，我们预增加总数（用作保留），并尝试通过工厂构造一个ForkJoinWorkerThread。
-     * 构造后，新线程将调用registerWorker，在此构造一个WorkQueue并在workQueues数组中分配一个索引（必要时扩展该数组）。
-     * 然后启动线程。
-     * 如果这些步骤有任何异常，或者工厂返回空值，则deregisterWorker会调整计数并进行相应记录。
+     * 创造工作线程。要创建一个工作线程，我们预增加总计数（用作保留），并尝试通过工作线程的工厂构造一个ForkJoinWorkerThread。
+     * 构造后，新线程将调用registerWorker，在该方法中会构造一个WorkQueue，并且该WorkQueue会被分配一个位于workQueues数组中的索引（必要时扩展该数组）。
+     * 然后启动线程。如果上述这些步骤有任何异常，或者工厂返回null，则deregisterWorker会调整计数并进行相应记录。
      * 如果返回空值，则该线程池将继续以少于目标数量工作线程的状态运行。
-     * 如果有异常，则异常一般被传播到某个外面调用者
+     * 如果有异常，则异常一般被传播到某个外面调用者.
+     * 工作线程索引分配避免了扫描中的偏向（如果在从工作队列数组的开头开始顺序填充条目时，该偏向发生）。
+     * 我们将数组视为简单的二乘幂哈希表，并根据需要进行扩展。
+      * seedIndex增量可确保在需要调整大小或注销并替换工作线程之前不会发生冲突，此后将冲突可能性保持在较低水平。
+      * 我们不能在这里将ThreadLocalRandom.getProbe（）用于类似目的，因为该线程尚未启动，但是这样做是为了为现有外部线程创建提交队列。
      *
      * Deactivation and waiting. Queuing encounters several intrinsic
      * races; most notably that a task-producing thread can miss
@@ -620,20 +606,17 @@ public class ForkJoinPool extends AbstractExecutorService {
      * status (using Thread.interrupted) before any call to park, so
      * that park does not immediately return due to status being set
      * via some other unrelated call to interrupt in user code.
-     * 停用并等待。排队遇到了一些内在竞争。
-     * 最值得注意的是，产生任务的线程可能会错过看到（并发信号）这样一件线程，该线程放弃寻找任务但尚未进入等待队列。
-     * 当一个工作线程找不到要偷的任务时，它会停用并如对。
-     * 通常，由于GC或OS调度，缺少任务是暂时的。
-     * 为了减少错误警报的停用，扫描程序会在扫描期间计算队列状态的校验和。 （这里和其他地方使用的稳定性检查是快照技术的概率变体，请参阅Herlihy＆Shavit。）
-     * 工作线程放弃并尝试停用自己，仅在跨扫描之间，队列状态校验和是稳定。
+     * 停用并等待。排队遇到了一些内在竞争：
+     * 最值得注意的是，产生任务的线程可能会错过看到（并发信号给）这样一个线程，该线程放弃寻找任务但尚未进入等待队列。
+     * 当一个工作线程找不到要偷的任务时，它会停用并入队。通常，由于GC或OS调度，缺少任务是暂时的。
+     * 为了减少误报的停用，扫描程序会在扫描期间计算队列状态的校验和。 （这里和其他地方使用的稳定性检查是快照技术的概率变体，请参阅Herlihy＆Shavit。）
+     * 工作线程放弃并尝试停用，仅在多次扫描之间队列状态校验和是稳定之后。
      * 此外，为了避免丢失信号，它们在成功入队后重复此扫描过程，直到队列状态校验和再次稳定。
      * 在这种状态下，工作线程无法执行/运行它看到的任务，直到将该工作线程从队列中释放为止，因此工作线程本身最终会尝试释放自己或任何后续工作线程（请参见tryRelease）。
      * 否则，在进行空扫描时，停用的工作线程会在阻塞（通过park）之前使用自适应本地自旋构造（请参阅awaitWork）。
      * 请注意有关Thread.interrupts围绕parking和其他阻塞的不寻常约定：由于中断仅用于提醒线程检查终止（无论如何在阻塞时进行检查终止），
-     * 因此我们在调用任何park之前清除中止状态（使用Thread.interrupted），
-     * 以便在由于通过在用户代码中，其他一些不相关的调用interrupt来设置状态，因此Park不会立即返回。
-     *
-     *
+     * 因此我们在调用任何park之前清除中断状态（使用Thread.interrupted），
+     * 以便由于状态被通过在用户代码中的其他一些不相关的调用interrupt来设置，park不会立即返回。
      *
      *
      * Signalling and activation.  Workers are created or activated
@@ -653,11 +636,13 @@ public class ForkJoinPool extends AbstractExecutorService {
      * field of WorkQueues to reduce unnecessary calls to unpark.
      * (This requires a secondary recheck to avoid missed signals.)
      * 信号和激活。仅当似乎至少可以找到并执行一个任务时，才创建或激活工作线程。
-     * 在（由工作线程或外部提交者）将其推送到先前（可能是）空队列时，会在空闲状态时向工作线程发出信号，或者在存在少于给定并行度的情况下创建工作线程。
+     * 在（由工作线程或外部提交者）将其推送到先前（可能是）空队列时，如果工作线程处于空闲状态，则会向工作线程发出信号，或者在存在少于给定并行度的情况下创建工作线程。
      * 每当其他线程从队列中删除任务并注意到那里还有其他任务时，这些主要信号就会被其他工作线程支持。
-     * 在大多数平台上，发信号（unpark）的开销时间非常长，发信号给线程与该线程实际取得进展之间的时间可能非常长，因此值得从关键路径上分担这些延迟。
+     * 在大多数平台上，发信号（unpark）的开销时间非常长，并且在发信号给线程与该线程实际取得进展之间的时间也可能非常长，
+     * 因此值得从关键路径上分担这些延迟。
      * 另外，由于不活动的工作线程通常是重新扫描或旋转而不是阻塞，
-     * 因此我们设置并清除了WorkQueues的“ parker”字段，以减少不必要的unpark调用。 （这需要进行二次重新检查，以免丢失信号。）
+     * 因此我们设置并清除了WorkQueues的“ parker”字段，以减少不必要的unpark调用。
+      * （这需要进行二次重新检查，以免丢失信号。）
      * 
      * Trimming workers. To release resources after periods of lack of
      * use, a worker starting to wait when the pool is quiescent will
@@ -691,18 +676,19 @@ public class ForkJoinPool extends AbstractExecutorService {
      * for quiescence, but tryTerminate is biased to not trigger until
      * helpQuiescePool completes.)
      * 关闭和终止。调用shutdownNow会调用tryTerminate以原子方式设置runState位。
-     * 调用线程以及此后终止的所有其他工作线程，通过设置其（qlock）状态，取消工作线程中未处理的任务并唤醒这些工作线程，反复执行直到稳定为止，以此来帮助终止其他线程（但循环受工作线程数量限制）。
+     * 调用线程以及此后终止的所有其他工作线程，通过设置其（qlock）状态，取消工作线程中未处理的任务并唤醒这些工作线程，反复如此执行直到稳定为止，
+     * 以此来帮助终止其他线程（但循环受工作线程数量限制）。
      * 调用非突然的shutdown（）可以通过检查是否应该终止来开始此操作。
-     * 这主要取决于保持共识的“ ctl”的活动计数位——每当静止时，awaitWork都会调用tryTerminate。
+     * 这主要取决于保持共识的"ctl"的活动计数位——每当静止时，awaitWork都会调用tryTerminate。
      * 但是，外部提交者不参与该共识。
-     * 因此，tryTerminate会在队列中进行扫描（直到稳定），以确保在触发终止的“STOP”阶段之前, 不会存在正在进行中的任务提交的情况，也不会存在工作线程正要处理任务的情况。
+     * 因此，tryTerminate会在队列中进行扫描（直到稳定），以确保在触发终止的"STOP" 阶段之前, 不会存在正在进行中的任务提交的情况，也不会存在工作线程正要处理任务的情况。
      *  （注意：启用关闭功能后，如果调用helpQuiescePool会发生内在冲突。两者都等待静态，但是tryTerminate倾向于在helpQuiescePool完成之前不会触发。）
      *
      *
      *
      *
      *
-     * Joining Tasks
+     * Joining Tasks 合并任务
      * =============
      *
      * Any of several actions may be taken when one worker is waiting
@@ -714,13 +700,19 @@ public class ForkJoinPool extends AbstractExecutorService {
      * possible is not necessarily a good idea since we may need both
      * an unblocked task and its continuation to progress.  Instead we
      * combine two tactics:
+     * 当一个工作线程正在等待合并另一工作线程偷来的（或总是被持有的）任务时，可以采取多种操作中的任何一种。
+     * 因为我们将许多任务复用到一个工作线程池上，所以我们不能只让这些工作线程阻塞（如Thread.join中一样）。
+     * 我们也不能只是将合并者的运行时堆栈重新分配给另一个，然后在以后替换该堆栈，这将是"continuation"的一种形式，
+     * 即使这可能，也不一定是一个好主意，因为我们可能既需要无阻塞的任务，又需要继续执行它。
+     * 相反，我们结合了两种策略：
      *
      *   Helping: Arranging for the joiner to execute some task that it
      *      would be running if the steal had not occurred.
-     *
+     *   Helping：如果steal还没有发生, 则安排合并者工作线程执行一些其他要运行的任务。
      *   Compensating: Unless there are already enough live threads,
      *      method tryCompensate() may create or re-activate a spare
      *      thread to compensate for blocked joiners until they unblock.
+     *   Compensating：除非已经有足够的活动线程，否则方法tryCompensate()可能会创建或重新激活一个备用线程以补偿阻塞的合并者线程，直到它们解除阻塞为止。
      *
      * A third form (implemented in tryRemoveAndExec) amounts to
      * helping a hypothetical compensator: If we can readily tell that
@@ -729,16 +721,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * without the need for a compensation thread (although at the
      * expense of larger run-time stacks, but the tradeoff is
      * typically worthwhile).
-     * 当一个工作线程正在等待加入另一工作线程偷来的（或总是被持有的）任务时，可以采取多种措施中的任何一种。
-     * 因为我们将许多任务复用到一个工作池上，所以我们不能只让这些工作线程阻塞（如Thread.join中一样）。
-     * 我们也不能只是将joiner的运行时堆栈重新分配给另一个，然后在以后替换该堆栈，这将是“ continuation”的一种形式，
-     * 即使可能，也不一定是一个好主意，因为我们可能既需要无阻塞的任务，又需要继续执行它。
-     * 相反，我们结合了两种策略：
-     *    Helping：如果steal还没有发生, 则安排joiner执行一些其他任务。
-     *    Compensating：除非已经有足够的活动线程，否则方法tryCompensate（）可能会创建或重新激活一个备用线程以补偿阻塞的joiner线程，直到它们解除阻塞为止。
-     *
-     * 第三种形式（在tryRemoveAndExec中实现）相当于帮助一个假设的补偿器：如果我们可以很容易地看出补偿器的可能动作是窃取并执行要加入的任务，
-     * 则joining线程可以直接这样做，而无需执行任何补偿线程（尽管以较大的运行时堆栈为代价，但通常值得进行权衡）。
+     * 第三种形式（在tryRemoveAndExec中实现）相当于帮助一个假设的补偿器：如果我们可以很容易地看出补偿器的可能动作是窃取并执行正被合并的任务，
+     * 则合并线程可以直接这样做，而无需执行任何补偿线程（尽管以较大的运行时堆栈为代价，但通常值得进行权衡）。
      *
      * The ManagedBlocker extension API can't use helping so relies
      * only on compensation in method awaitBlocker.
@@ -773,21 +757,22 @@ public class ForkJoinPool extends AbstractExecutorService {
      * is usually a good idea).  (4) We bound the number of attempts
      * to find work using checksums and fall back to suspending the
      * worker and if necessary replacing it with another.
-     * helpStealer中的算法需要一种“linear   helping”形式。
+     * helpStealer中的算法需要一种"linear helping"形式。
      * 每个工作线程（在currentSteal字段中）记录它从其他工作线程（或一个任务提交）中偷走的最新任务。
-     * 它还记录（在currentJoin字段中）它当前正在主动加入的任务。
-     * helpStealer方法使用这些标记来尝试寻找可以帮助赶紧完成主动加入的任务的工作线程（即从中偷回任务并执行该任务）。
-     * 因此，如果要加入的任务未被盗用，则joiner工作线程执行的任务将由其自己的本地双端队列进行。
-     * 这是Wagner＆Calder“Leapfrogging: a portable technique for implementing   efficient futures”（SIGPLAN Notices, 1993
+     * 它还记录（在currentJoin字段中）它当前正在主动合并的任务。
+     * helpStealer方法使用这些标记来尝试找到一个工作线程，该工作线程帮助赶紧完成主动合并的任务（即，从中偷回任务并执行该任务）。
+     * 因此，合并者工作线程执行一个任务，该任务将在自己的本地双端队列上（该双端队列有待合并的，未被偷的任务）。
+     * 这是Wagner＆Calder " Leapfrogging: a portable technique for implementing efficient futures"（SIGPLAN Notices, 1993
      *  (http://portal.acm.org/citation.cfm?id=155354）中描述的方法的保守变体。
      * 它的不同之处在于：
-     * （1）我们仅在窃取时在工作线程之间维护依赖关系链接，而不使用按任务记帐。
-     * 有时这需要对workQueues数组进行线性扫描以找到盗窃者线程，但通常不需要这样做，因为盗窃者线程会留下提示（可能会变得陈旧/错误）来定位他们。
-     * 这只是一个提示，因为一个工作线程可能发生多次偷窃，而提示仅记录了其中一个偷窃（通常是最新的）。
-     * 提示将成本隔离在需要的时间，而不是增加每个任务的开销。
+     * （1）我们仅在窃取时在工作线程之间维护依赖链接，而不使用按任务记录。
+     * 这样做有时需要对workQueues数组进行线性扫描以找到盗窃者线程，但通常不需要这样做，因为盗窃者线程会留下提示（可能会变得陈旧/错误）来定位他们。
+     * 这只是一个提示，因为一个工作线程可能发生多次偷盗，而提示仅记录了其中一个偷窃（通常是最新的）。
+     * 提示将成本隔离在要求的时间，而不是按每个任务维护从而增加开销。
      * （2）它是“shallow”的，忽略了嵌套和潜在的循环相互窃取。
-     * （3）这是故意有竞争的：字段currentJoin仅在主动加入时进行更新，这意味着我们在长期任务，GC停顿等情况下会错过链接链路（这很正常，因为在这种情况下进行阻塞通常是个好主意） 。
-     *  4）我们使用校验和来限制寻找任务的尝试次数，超过尝试次数则回退到暂停该工作线程，并在必要时将其替换为另一个工作线程。
+     * （3）这是故意有竞争的：字段currentJoin仅在主动合并时进行更新，这意味着我们在长期任务，GC停顿等情况下会错过链接链路
+     * （这很正常，因为在这种情况下，阻塞通常是个好主意） 。
+     * （4）我们使用校验和来限制寻找任务的尝试次数，超过尝试次数则回退到暂停该工作线程，并在必要时将其替换为另一个工作线程。
      *
      *
      *
@@ -797,9 +782,9 @@ public class ForkJoinPool extends AbstractExecutorService {
      * local pops to non-local polls). However, this still entails
      * some traversal of completer chains, so is less efficient than
      * using CountedCompleters without explicit joins.
-     * CountedCompleters的帮助操作不需要跟踪currentJoins：
-     * 方法helpComplete可以获取和执行与正在等待的任务具有相同根的任何任务（优先于本地弹出而不是非本地轮询）。
-     * 但是，这仍然需要对completer程序链进行一些遍历，因此效率不如使用没有显式联接的CountedCompleters。
+     * CountedCompleters的帮助操作不要求跟踪currentJoins：
+     * 方法helpComplete可以获取和执行与正在等待的任务具有相同根的任何任务（优先本地pops而不是非本地polls）。
+     * 但是，这仍然需要对completer链进行一些遍历，因此效率不如使用没有显式合并的CountedCompleters。
      *
      * Compensation does not aim to keep exactly the target
      * parallelism number of unblocked threads running at any given
@@ -815,15 +800,12 @@ public class ForkJoinPool extends AbstractExecutorService {
      * beneficial: when a worker with an empty queue (thus no
      * continuation tasks) blocks on a join and there still remain
      * enough threads to ensure liveness.
-     * 补偿的目的并不是要确保在任何给定时间都保持目标并行度的无阻塞线程运行。
-     * 此类的某些先前版本对所有阻塞的连接采用理解补偿。
-     * 但是，实际上，绝大多数阻塞是GC和其他JVM或OS活动的瞬时副产品，这些副产品由于更换而变得更加糟糕。
-     * 当前，仅在通过检查字段WorkQueue.scanState确认所有据称活动的线程正在处理任务之后，才尝试进行补偿，从而消除了大多数误报。
-     * 此外，在最不常见的情况下，绕过补偿（允许更少的线程）是很少有好处的：
-     * 当任务队列为空的工作线程（因此没有继续的任务）在连接上阻塞时，仍然有足够的线程来确保活动。
-     *
-     *
-     *
+     * 补偿的目的并不是要确保在任何给定时间都保持目标并行度个无阻塞线程运行。
+     * 此类的某些先前版本对所有阻塞的合并采用立刻补偿。
+     * 但是，实际上，绝大多数阻塞是GC和其他JVM或OS活动的瞬时副产品，这些副产品会由于更换新工作线程而变得更糟。
+     * 当前，仅在通过检查字段WorkQueue.scanState，确认所有据称活动的线程正在处理任务之后，才尝试进行补偿，从而消除了大多数误报。
+     * 此外，在最常见的情况下（其中补偿没什么好处），补偿被绕过（这允许更少的线程）：
+     * 当任务队列为空的工作线程（因此没有继续的任务）在合并上阻塞时，仍然有足够的线程来确保活动。
      *
      * The compensation mechanism may be bounded.  Bounds for the
      * commonPool (see commonMaxSpares) better enable JVMs to cope
@@ -836,7 +818,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * simultaneously live threads may transiently exceed bounds.
      * 补偿机制可能是有界的。 commonPool的界限（请参阅commonMaxSpares）可以更好地使JVM在耗尽资源之前处理编程错误和滥用。
      * 在其他情况下，用户可能会提供限制线程构造的工厂。 与其他所有池一样，此池中的边界影响不精确。
-     * 当取消注销线程时（而不是退出时）和JVM和OS回收资源时，总的工作线程计数会减少。 因此，同时处于活动状态的线程数可能会暂时超出限制。
+     * 当线程取消注销时（而不是他们退出时）和资源被JVM和OS回收时，总的工作线程计数会减少。
+     * 因此，同时处于活动状态的线程数可能会暂时超出限制。
      *
      *
      * Common Pool
@@ -849,9 +832,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * allocation. Most bootstrapping occurs within method
      * externalSubmit during the first submission to the pool.
      * 静态公共池在静态初始化之后始终存在。
-     * 由于不需要使用它（或任何其他创建的池），因此我们将初始构造开销和占用空间最小化到大约十二个字段的设置，而没有嵌套分配。
-     * 在第一次提交到池期间，大多数引导发生在方法externalSubmit中。
-     *
+     * 由于不需要使用它（或任何其他创建的池），因此我们最小化初始构造开销和占用空间到大约十二个字段的设置（这些字段没有嵌套分配）。
+     * 大多数引导发生在方法externalSubmit中，在第一次提交任务到池期间。
      *
      * When external threads submit to the common pool, they can
      * perform subtask processing (see externalHelpComplete and
@@ -865,13 +847,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * liberally sprinkled task status checks) in inapplicable cases
      * amounts to an odd form of limited spin-wait before blocking in
      * ForkJoinTask.join.
-     * 当外部线程提交到公共池时，它们可以在联接时执行子任务处理（请参阅externalHelpComplete和相关方法）。
-     * 通过caller-helps策略，可以将公共池并行度级别设置为比可用核心总数少一个（或多个），对于纯调用者运行，甚至可以设置为零。
-     * 我们不需要记录是否将外部提交提交到公共池中——否则，外部帮助方法会迅速返回。
-     * 否则，这些提交者将因等待完成而被阻塞，因此在不适用的情况下，额外的工作量（大量分散的任务状态检查）在ForkJoinTask.join阻塞之前构成了有限的自旋等待的一种奇怪形式。
-     * 
-     *
-     *
+     * 当外部线程提交任务到公共池时，它们可以在合并时执行子任务处理（请参阅externalHelpComplete和相关方法）。
+     * caller-helps策略使用将公共池并行度级别设置为比可用核心总数少一个（或多个）合理，或者对于caller-runs运行，甚至可以设置为零合理。
+     * 我们不需要记录外部提交的任务是否是提交到公共池中的——如果不是，外部帮助方法会迅速返回。
+     * 否则，这些提交者线程将因等待任务完成而被阻塞，因此在不适用的情况下，
+     * 额外的工作量（大量分散的任务状态检查）在ForkJoinTask.join阻塞之前构成了有限的自旋等待的一种奇怪形式。
      *
      * As a more appropriate default in managed environments, unless
      * overridden by system properties, we use workers of subclass
@@ -883,8 +863,8 @@ public class ForkJoinPool extends AbstractExecutorService {
      * be JVM-dependent and must access particular Thread class fields
      * to achieve this effect.
      * 作为托管环境中更合适的默认值，除非被系统属性覆盖，否则当存在SecurityManager时，我们将使用子类InnocuousForkJoinWorkerThread的工作线程。
-     * 这些工作线程没有权限设置，不属于任何用户定义的ThreadGroup，并且在执行任何顶级任务后擦除所有ThreadLocals（请参阅WorkQueue.runTask）。
-     *
+     * 这些工作线程没有权限设置，不属于任何用户定义的ThreadGroup，并且在执行任何top-level任务后擦除所有ThreadLocals（请参阅WorkQueue.runTask）。
+     * 关联的机制（主要在ForkJoinWorkerThread中）可能是JVM相关的，并且必须访问特定的Thread类字段才能实现此效果。
      *
      * Style notes
      * ===========
@@ -906,14 +886,13 @@ public class ForkJoinPool extends AbstractExecutorService {
      * bypass/return, not exception throws, because they may
      * legitimately arise due to cancellation/revocation during
      * shutdown.
-     * 内存排序主要依赖于Unsafe内部函数，这些内部函数承担进一步的责任，即明确执行空检查和边界检查，否则由JVM隐式执行。
-     * 这可能很尴尬和丑陋，但也反映了需要控制非常活泼的代码中具有很少不变性的异常情况下的结果。
+     * 内存排序主要依赖于Unsafe内部函数，这些内部函数承担进一步的责任，即明确执行空检查和边界检查，否则这些检查由JVM隐式执行。
+     * 这可能很尴尬和丑陋的，但也反映了需要控制异常情况（这些情况下会出现非常竞争的代码（有非常少的不变性））之间的结果。
      * 因此，这些显式检查无论如何都会以某种形式存在。
-     * 使用之前，所有字段都被读入本地，如果它们是引用则进行空检查。
-     * 通常以“ C”-like 样式在方法或块的开头列出声明，并在首次遇到时使用内联分配来完成。
-     * 数组边界检查通常是通过用array.length-1进行掩码来执行的，array.length-1依赖于不变的条件，该不变条件即这些数组是用正长度创建的，并且该长度被偏执地检查过了。
+     * 在使用之前，所有字段都被读入本地，如果它们是引用则进行空检查。
+     * 通常以"C"-like 样式在方法或块的开头列出声明，并在首次遇到时使用内联分配来完成。
+     * 数组边界检查通常是通过用array.length-1进行掩码来执行，array.length-1依赖于不变性，该不变性即这些数组是用正长度创建的，并且该长度被偏执地检查过了。
      * 几乎所有显式检查都会导致绕过/返回，而不是异常抛出，因为它们可能由于关闭期间的取消/撤销而合法地出现。
-     *
      *
      * There is a lot of representation-level coupling among classes
      * ForkJoinPool, ForkJoinWorkerThread, and ForkJoinTask.  The
@@ -927,11 +906,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * (including several unnecessary-looking hoisted null checks)
      * that help some methods perform reasonably even when interpreted
      * (not compiled).
-     *  在类ForkJoinPool，ForkJoinWorkerThread和ForkJoinTask之间，有很多表示层级的耦合。
-     *   WorkQueue的字段维护由ForkJoinPool管理的数据结构，因此可以直接访问。
-     *  减少这种情况几乎没有意义，由于任何相关Future在表示的改变都将需要伴随算法更改。
+     *  <strong>在类ForkJoinPool，ForkJoinWorkerThread和ForkJoinTask之间，有很多表示层级的耦合。</strong>
+     *   WorkQueue的字段维护由ForkJoinPool管理的数据结构，因此可以被ForkJoinPool直接访问。
+     *  减少这种情况几乎没有意义，由于任何相关Future在表示上的改变都将伴随算法更改。
      *  几种方法本质上无处不在，因为它们必须累积对局部变量中保存的字段的一致读取集。
-     *  还有其他编码异常（包括一些看起来不必要的悬挂式空检查），即使在解释（未编译）时也可以帮助某些方法合理执行。
+     *  还有其他奇怪编码（包括一些看起来不必要的悬挂式空检查），他们即使在解释（未编译）时也可以帮助某些方法合理执行。
      *
      *
      * The order of declarations in this file is (with a few exceptions):
