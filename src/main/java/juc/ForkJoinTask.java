@@ -236,12 +236,14 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * If not done, sets SIGNAL status and performs Object.wait(timeout).
      * This task may or may not be done on exit. Ignores interrupts.
+     * 如果未完成，则设置SIGNAL状态并执行Object.wait（timeout）。
+     * 退出时可能会或可能不会完成此任务。 忽略中断。
      *
      * @param timeout using Object.wait conventions.
      */
     final void internalWait(long timeout) {
         int s;
-        if ((s = status) >= 0 && // force completer to issue notify
+        if ((s = status) >= 0 && // force completer to issue notify  强制完成者发出通知
                 U.compareAndSwapInt(this, STATUS, s, s | SIGNAL)) {
             synchronized (this) {
                 if (status >= 0)
@@ -566,6 +568,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
 
     /**
      * Poll stale refs and remove them. Call only while holding lock.
+     * 轮询陈旧的ref并将其删除。 仅在持有锁的状态下调用。
      */
     private static void expungeStaleExceptions() {
         for (Object x; (x = exceptionTableRefQueue.poll()) != null; ) {
@@ -594,6 +597,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * If lock is available, poll stale refs and remove them.
      * Called from ForkJoinPool when pools become quiescent.
+     * 如果有锁可用，则轮询过时的引用并删除它们。
+     * 当池变为静态时从ForkJoinPool调用。
      */
     static final void helpExpungeStaleExceptions() {
         final ReentrantLock lock = exceptionTableLock;
