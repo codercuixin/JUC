@@ -849,11 +849,12 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     }
 
     /**
-     * todo this
      * Commences performing this task, awaits its completion if
      * necessary, and returns its result, or throws an (unchecked)
      * {@code RuntimeException} or {@code Error} if the underlying
      * computation did so.
+     * 开始执行此任务，在必要时等待其完成，然后返回其结果，如果底层计算已执行，
+     * 则抛出（未经检查）{@code RuntimeException}或{@code Error}。
      *
      * @return the computed result
      */
@@ -876,6 +877,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * #getException()} and related methods to check if they have been
      * cancelled, completed normally or exceptionally, or left
      * unprocessed.
+     * 分叉给定的任务，在每个任务都是{@code isDone}的或遇到（未检查的）异常时返回，在这种情况下，该异常被重新抛出。
+     * 如果一个以上的任务遇到一个异常，则此方法将抛出这些异常中的任何一个。
+     * 如果任何任务遇到异常，则其他任务可能会被取消。
+     * 但是，不能保证在异常返回时单个任务的执行状态。
+     * 可以使用{@link #getException（）}和相关方法来检查每个任务的状态，以检查它们是否已被取消，正常或异常完成或未处理。
      *
      * @param t1 the first task
      * @param t2 the second task
@@ -901,6 +907,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * each task may be obtained using {@link #getException()} and
      * related methods to check if they have been cancelled, completed
      * normally or exceptionally, or left unprocessed.
+     * 分叉给定的任务，在每个任务都是{@code isDone}的或遇到（未检查的）异常时返回，在这种情况下，该异常被重新抛出。
+     * 如果一个以上的任务遇到一个异常，则此方法将抛出这些异常中的任何一个。
+     * 如果任何任务遇到异常，则其他任务可能会被取消。
+     * 但是，不能保证在异常返回时单个任务的执行状态。
+     * 可以使用{@link #getException（）}和相关方法来检查每个任务的状态，以检查它们是否已被取消，正常或异常完成或未处理。
      *
      * @param tasks the tasks
      * @throws NullPointerException if any task is null
@@ -943,6 +954,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * #getException()} and related methods to check if they have been
      * cancelled, completed normally or exceptionally, or left
      * unprocessed.
+     * 分叉指定集合中的所有任务，当每个任务是{@code isDone}的或遇到（未检查的）异常时返回，在这种情况下，异常被重新抛出。
+     * 如果一个以上的任务遇到一个异常，则此方法将引发这些异常中的任何一个。
+     * 如果任何任务遇到异常，则其他任务可能会被取消。
+     * 但是，不能保证在异常返回时单个任务的执行状态。
+     * 可以使用{@link #getException（）}和相关方法来获取每个任务的状态，以检查它们是否已取消，是否正常或异常完成或未处理。
      *
      * @param tasks the collection of tasks
      * @param <T>   the type of the values returned from the tasks
@@ -1046,7 +1062,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Returns {@code true} if this task completed without throwing an
      * exception and was not cancelled.
-     * 如果完成是没有抛出异常¬¬
+     * 如果任务完成时没有抛出异常并且没有被取消，则返回true
      *
      * @return {@code true} if this task completed without throwing an
      * exception and was not cancelled
@@ -1059,6 +1075,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * Returns the exception thrown by the base computation, or a
      * {@code CancellationException} if cancelled, or {@code null} if
      * none or if the method has not yet completed.
+     * 返回基础计算引发的异常；如果任务被取消，则返回{@code CancellationException}；
+     * 如果没有异常或者该方法尚未完成，则返回{@code null}。
      *
      * @return the exception, or {@code null} if none
      */
@@ -1078,6 +1096,10 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * in other situations is discouraged.  This method is
      * overridable, but overridden versions must invoke {@code super}
      * implementation to maintain guarantees.
+     * 异常完成此任务，并且如果尚未中止或取消，则会导致该任务在{@code join}和相关操作上引发给定的异常。
+     * 此方法可用于在异步任务中引发异常，或强制完成原本不会完成的任务。
+     * 不建议在其他情况下使用它。
+     * 此方法是可重写的，但是被重写的版本必须调用{@code super}实现来维护保证。
      *
      * @param ex the exception to throw. If this exception is not a
      *           {@code RuntimeException} or {@code Error}, the actual exception
@@ -1099,6 +1121,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * discouraged. This method is overridable, but overridden
      * versions must invoke {@code super} implementation to maintain
      * guarantees.
+     * 完成此任务，如果尚未终止或取消，则返回该给定值作为随后调用{@code join}和相关操作的结果。
+     * 此方法可用于为异步任务提供结果，或为否则无法正常完成的任务提供替代处理。
+     * 不建议在其他情况下使用它。
+     * 此方法是可重写的，但是被重写的版本必须调用{@code super}实现来维护保证。
+     *
      *
      * @param value the result value for this task
      */
@@ -1117,7 +1144,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * recent value established by {@link #setRawResult} (or {@code
      * null} by default) will be returned as the result of subsequent
      * invocations of {@code join} and related operations.
-     *
+     * 通常无需设置一个值即可完成此任务。
+     * 由{@link #setRawResult}建立的最新值（默认为{@code null}）将作为后续调用{@code join}和相关操作的结果而返回。
      * @since 1.8
      */
     public final void quietlyComplete() {
@@ -1127,6 +1155,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Waits if necessary for the computation to complete, and then
      * retrieves its result.
+     * 等待必要的计算完成，然后检索其结果。
+     * todo 重点
      *
      * @return the computed result
      * @throws CancellationException if the computation was cancelled
@@ -1149,6 +1179,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Waits if necessary for at most the given time for the computation
      * to complete, and then retrieves its result, if available.
+     * 必要时最多等待给定时间以完成计算，然后检索其结果（如果有）。
      *
      * @param timeout the maximum time to wait
      * @param unit    the time unit of the timeout argument
@@ -1212,6 +1243,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * exception. This method may be useful when processing
      * collections of tasks when some have been cancelled or otherwise
      * known to have aborted.
+     * 合并此任务，而不返回其结果或引发其异常。
+     * 当处理其中一些已被取消或已知中止的任务集合时，此方法可能很有用。
      */
     public final void quietlyJoin() {
         doJoin();
@@ -1221,6 +1254,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * Commences performing this task and awaits its completion if
      * necessary, without returning its result or throwing its
      * exception.
+     * 开始执行此任务，并在必要时等待其完成，而不会返回结果或引发异常。
      */
     public final void quietlyInvoke() {
         doInvoke();
@@ -1232,6 +1266,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * be of use in designs in which many tasks are forked, but none
      * are explicitly joined, instead executing them until all are
      * processed.
+     * 可能会执行任务，直到托管当前任务的池{@link ForkJoinPool＃isQuiescent是静态的}为止。
+     * 此方法可能在许多任务被分叉但没有明确地合并任何任务的设计中使用，而不是执行它们直到所有任务都被处理。
      */
     public static void helpQuiesce() {
         Thread t;
@@ -1251,12 +1287,19 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * under any other usage conditions are not guaranteed.
      * This method may be useful when executing
      * pre-constructed trees of subtasks in loops.
+     * 重置此任务的内部记录状态，从而允许后续的{@code fork}调用。
+     * 此方法允许重复使用此任务，但仅当此任务从未被分叉过，或已被分叉过，然后完成并且此任务的所有未完成合并也已完成时，才发生重用。
+     * 不保证在任何其他使用条件下的效果。
+     * 在循环中执行子任务的预构建树时，此方法可能很有用。
      *
      * <p>Upon completion of this method, {@code isDone()} reports
      * {@code false}, and {@code getException()} reports {@code
      * null}. However, the value returned by {@code getRawResult} is
      * unaffected. To clear this value, you can invoke {@code
      * setRawResult(null)}.
+     * <p>此方法完成后，{@code isDone()}报告{@code false}，并且{@code getException()}报告{@code null}。
+     * 但是，{@code getRawResult}返回的值不受影响。
+     * 要清除此值，可以调用{@code setRawResult(null)}。
      */
     public void reinitialize() {
         if ((status & DONE_MASK) == EXCEPTIONAL)
@@ -1268,6 +1311,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Returns the pool hosting the current task execution, or null
      * if this task is executing outside of any ForkJoinPool.
+     * 返回托管当前任务执行的池，如果此任务在任何ForkJoinPool之外执行，则返回null。
      *
      * @return the pool, or {@code null} if none
      * @see #inForkJoinPool
@@ -1281,6 +1325,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     /**
      * Returns {@code true} if the current thread is a {@link
      * ForkJoinWorkerThread} executing as a ForkJoinPool computation.
+     * 如果当前线程是作为ForkJoinPool计算执行的{@link ForkJoinWorkerThread}，则返回{@code true}。
      *
      * @return {@code true} if the current thread is a {@link
      * ForkJoinWorkerThread} executing as a ForkJoinPool computation,
@@ -1297,6 +1342,9 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * not commenced executing in another thread.  This method may be
      * useful when arranging alternative local processing of tasks
      * that could have been, but were not, stolen.
+     * 尝试取消调度此任务的执行。
+     * 如果此任务是当前线程最近分叉的任务，并且尚未开始在另一个线程中执行，则此方法通常（但不能保证）成功。
+     * 当安排可能已经但没有被盗的任务的替代本地处理时，此方法可能很有用。
      *
      * @return {@code true} if unforked
      */
@@ -1312,6 +1360,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * forked by the current worker thread but not yet executed. This
      * value may be useful for heuristic decisions about whether to
      * fork other tasks.
+     * 返回当前工作线程已分叉但尚未执行的任务数量的估计值。
+     * 对于有关是否分叉其他任务的启发式决策，此值可能有用。
      *
      * @return the number of tasks
      */
@@ -1335,6 +1385,11 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * aim to maintain a small constant surplus (for example, 3) of
      * tasks, and to process computations locally if this threshold is
      * exceeded.
+     * 返回一个估计值，该估计值是当前工作线程所保存的本地排队任务比其他可能窃取它们的工作线程多多少；
+     * 如果该线程不在ForkJoinPool中运行，则返回零。
+     * 对于有关是否分叉其他任务的启发式决策，此值可能有用。
+     * 在ForkJoinTasks的许多用法中，在稳定状态下，每个工作线程都应力争保持少量恒定的剩余任务（例如3个），
+     * 并在超出此阈值的情况下本地处理计算。
      *
      * @return the surplus number of tasks, which may be negative
      */
@@ -1350,6 +1405,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * is not known to have been completed.  This method is designed
      * to aid debugging, as well as to support extensions. Its use in
      * any other context is discouraged.
+     * 返回将由{@link #join}返回的结果（即使此任务异常完成），或者返回{@code null}（如果未知该任务尚未完成）。
+     * 此方法旨在帮助调试并支持扩展。不建议在其他任何上下文中使用它。
      *
      * @return the result, or {@code null} if not completed
      */
@@ -1359,6 +1416,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * Forces the given value to be returned as a result.  This method
      * is designed to support extensions, and should not in general be
      * called otherwise.
+     * 强制将给定值作为结果返回。 此方法旨在支持扩展，一般不应以其他方式调用。
      *
      * @param value the value
      */

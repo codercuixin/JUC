@@ -551,7 +551,6 @@ public abstract class AbstractQueuedSynchronizer
 
 
         /**
-         * todo 翻译准确性
          * predNext明显是要取消连接节点。下面的CAS操作将失败，如果没有失败，在这种情况下，我们没有与另一个节点取消或通知竞争，
          * 所以不需要进一步的行动。
          */

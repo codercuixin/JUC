@@ -251,7 +251,6 @@ public class ReentrantReadWriteLock
          *
          * <p>更确切地说，firstReader是唯一一个线程，该线程最后一次将共享计数从0更改为1，并且此后没有释放读锁。
          *  如果没有这样的线程，则返回null。
-         * todo 翻译准确性 since 翻译成由于？
          * <p>除非由于tryReleaseShared将其设置为null，线程在不放弃读锁的情况下终止，否则不会导致垃圾保留。
          *
          * <p>通过良性数据竞赛访问； 依赖于内存模型的对引用的out-of-thin-air保证。
@@ -262,7 +261,7 @@ public class ReentrantReadWriteLock
 
         Sync() {
             readHolds = new ThreadLocalHoldCounter();
-            setState(getState()); // 确保readHolds的可见性。 todo 根据volatile的语义解释
+            setState(getState()); // 确保readHolds的可见性。
         }
 
         /*
@@ -286,7 +285,6 @@ public class ReentrantReadWriteLock
          * both read and write holds that are all released during a
          * condition wait and re-established in tryAcquire.
          * 请注意，tryRelease和tryAcquire可以被Conditions调用。
-         * //todo 翻译准确性，re-established
          * 因此，它们的参数可能同时包含读和写持有，所有这些都在条件等待期间释放，并在tryAcquire中重新建立。
          */
 
