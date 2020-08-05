@@ -6,13 +6,4 @@ package volatileTest;
  */
 public class VolatileField {
     private volatile int a;
-    public int getA(){
-        return a;
-    }
-    public void setA(int a){
-        this.a = a;
-    }
-    public static void main(String[] args){
-
-    }
 }
