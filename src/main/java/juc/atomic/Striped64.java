@@ -35,6 +35,7 @@
 
 package juc.atomic;
 
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -128,7 +129,7 @@ abstract class Striped64 extends Number {
         }
 
         // Unsafe mechanics
-        private static final sun.misc.Unsafe UNSAFE;
+        private static final Unsafe UNSAFE;
         private static final long valueOffset;
         static {
             try {
@@ -393,13 +394,13 @@ abstract class Striped64 extends Number {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long BASE;
     private static final long CELLSBUSY;
     private static final long PROBE;
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> sk = Striped64.class;
             BASE = UNSAFE.objectFieldOffset
                 (sk.getDeclaredField("base"));

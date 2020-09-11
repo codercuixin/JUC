@@ -36,6 +36,7 @@
 package juc;
 
 import juc.locks.LockSupport;
+import sun.misc2.Unsafe;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -534,14 +535,14 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
         private static final long serialVersionUID = -3375979862319811754L;
 
         // Unsafe mechanics
-        private static final sun.misc.Unsafe UNSAFE;
+        private static final Unsafe UNSAFE;
         private static final long itemOffset;
         private static final long nextOffset;
         private static final long waiterOffset;
 
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
+                UNSAFE = Unsafe.getUnsafe();
                 Class<?> k = Node.class;
                 itemOffset = UNSAFE.objectFieldOffset
                         (k.getDeclaredField("item"));
@@ -1456,14 +1457,14 @@ public class LinkedTransferQueue<E> extends AbstractQueue<E>
 
     // Unsafe mechanics
 
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long headOffset;
     private static final long tailOffset;
     private static final long sweepVotesOffset;
 
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> k = juc.LinkedTransferQueue.class;
             headOffset = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("head"));

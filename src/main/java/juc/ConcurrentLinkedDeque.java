@@ -35,6 +35,8 @@
 
 package juc;
 
+import sun.misc2.Unsafe;
+
 import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -325,14 +327,14 @@ public class ConcurrentLinkedDeque<E>
 
         // Unsafe mechanics
 
-        private static final sun.misc.Unsafe UNSAFE;
+        private static final Unsafe UNSAFE;
         private static final long prevOffset;
         private static final long itemOffset;
         private static final long nextOffset;
 
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
+                UNSAFE = Unsafe.getUnsafe();
                 Class<?> k = Node.class;
                 prevOffset = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("prev"));
@@ -1564,7 +1566,7 @@ public class ConcurrentLinkedDeque<E>
 
     // Unsafe mechanics
 
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long headOffset;
     private static final long tailOffset;
     static {
@@ -1573,7 +1575,7 @@ public class ConcurrentLinkedDeque<E>
         NEXT_TERMINATOR = new Node<Object>();
         NEXT_TERMINATOR.prev = NEXT_TERMINATOR;
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> k = ConcurrentLinkedDeque.class;
             headOffset = UNSAFE.objectFieldOffset
                 (k.getDeclaredField("head"));

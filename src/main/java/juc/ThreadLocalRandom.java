@@ -37,12 +37,12 @@ package juc;
 
 import juc.atomic.AtomicInteger;
 import juc.atomic.AtomicLong;
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.io.ObjectStreamField;
 import java.util.Random;
 import java.util.Spliterator;
-import java.util.SplittableRandom;
 import java.util.function.DoubleConsumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
@@ -1097,7 +1097,7 @@ public class ThreadLocalRandom extends Random {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long SEED;
     private static final long PROBE;
     private static final long SECONDARY;

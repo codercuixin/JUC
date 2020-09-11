@@ -1,10 +1,9 @@
 package unsafeTest;
 
-import sun.misc.Unsafe;
+import sun.misc2.Unsafe;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**

@@ -34,8 +34,8 @@
  */
 
 package juc;
-import juc.*;
 import juc.locks.LockSupport;
+import sun.misc2.Unsafe;
 
 /**
  * 一个可取消的异步计算。
@@ -446,13 +446,13 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long stateOffset;
     private static final long runnerOffset;
     private static final long waitersOffset;
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> k = FutureTask.class;
             stateOffset = UNSAFE.objectFieldOffset
                 (k.getDeclaredField("state"));

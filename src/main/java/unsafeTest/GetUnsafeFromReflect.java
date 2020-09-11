@@ -1,6 +1,6 @@
 package unsafeTest;
 
-import sun.misc.Unsafe;
+import sun.misc2.Unsafe;
 
 import java.lang.reflect.Field;
 

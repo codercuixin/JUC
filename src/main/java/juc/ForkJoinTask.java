@@ -36,6 +36,7 @@
 package juc;
 
 import juc.locks.ReentrantLock;
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.io.Serializable;
@@ -1791,7 +1792,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe U;
+    private static final Unsafe U;
     private static final long STATUS;
 
     static {

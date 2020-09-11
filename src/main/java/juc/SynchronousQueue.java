@@ -38,6 +38,7 @@ package juc;
 
 import juc.locks.LockSupport;
 import juc.locks.ReentrantLock;
+import sun.misc2.Unsafe;
 
 import java.util.*;
 
@@ -297,13 +298,13 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             }
 
             // Unsafe mechanics
-            private static final sun.misc.Unsafe UNSAFE;
+            private static final Unsafe UNSAFE;
             private static final long matchOffset;
             private static final long nextOffset;
 
             static {
                 try {
-                    UNSAFE = sun.misc.Unsafe.getUnsafe();
+                    UNSAFE = Unsafe.getUnsafe();
                     Class<?> k = SNode.class;
                     matchOffset = UNSAFE.objectFieldOffset
                             (k.getDeclaredField("match"));
@@ -526,12 +527,12 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
         }
 
         // Unsafe mechanics
-        private static final sun.misc.Unsafe UNSAFE;
+        private static final Unsafe UNSAFE;
         private static final long headOffset;
 
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
+                UNSAFE = Unsafe.getUnsafe();
                 Class<?> k = TransferStack.class;
                 headOffset = UNSAFE.objectFieldOffset
                         (k.getDeclaredField("head"));
@@ -599,13 +600,13 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             }
 
             // Unsafe mechanics
-            private static final sun.misc.Unsafe UNSAFE;
+            private static final Unsafe UNSAFE;
             private static final long itemOffset;
             private static final long nextOffset;
 
             static {
                 try {
-                    UNSAFE = sun.misc.Unsafe.getUnsafe();
+                    UNSAFE = Unsafe.getUnsafe();
                     Class<?> k = QNode.class;
                     itemOffset = UNSAFE.objectFieldOffset
                             (k.getDeclaredField("item"));
@@ -846,14 +847,14 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
             }
         }
 
-        private static final sun.misc.Unsafe UNSAFE;
+        private static final Unsafe UNSAFE;
         private static final long headOffset;
         private static final long tailOffset;
         private static final long cleanMeOffset;
 
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
+                UNSAFE = Unsafe.getUnsafe();
                 Class<?> k = TransferQueue.class;
                 headOffset = UNSAFE.objectFieldOffset
                         (k.getDeclaredField("head"));
@@ -1231,7 +1232,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E>
     }
 
     // Unsafe mechanics
-    static long objectFieldOffset(sun.misc.Unsafe UNSAFE,
+    static long objectFieldOffset(Unsafe UNSAFE,
                                   String field, Class<?> klazz) {
         try {
             return UNSAFE.objectFieldOffset(klazz.getDeclaredField(field));

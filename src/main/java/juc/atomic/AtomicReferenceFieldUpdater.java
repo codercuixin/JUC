@@ -35,7 +35,7 @@
 
 package juc.atomic;
 
-import sun.misc.Unsafe;
+import sun.misc2.Unsafe;
 import sun.reflect.CallerSensitive;
 import sun.reflect.Reflection;
 import unsafeTest.GetUnsafeFromReflect;

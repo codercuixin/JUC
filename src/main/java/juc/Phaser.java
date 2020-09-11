@@ -37,6 +37,7 @@ package juc;
 
 import juc.atomic.AtomicReference;
 import juc.locks.LockSupport;
+import sun.misc2.Unsafe;
 
 /**
  * A reusable synchronization barrier, similar in functionality to
@@ -1139,12 +1140,12 @@ public class Phaser {
 
     // Unsafe mechanics
 
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long stateOffset;
 
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> k = juc.Phaser.class;
             stateOffset = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("state"));

@@ -1,6 +1,6 @@
 package juc.locks;
 
-import sun.misc.Unsafe;
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.ArrayList;

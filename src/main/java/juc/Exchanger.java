@@ -36,9 +36,7 @@
 
 package juc;
 
-import juc.atomic.AtomicInteger;
-import juc.atomic.AtomicReference;
-import juc.locks.LockSupport;
+import sun.misc2.Unsafe;
 
 /**
  * A synchronization point at which threads can pair and swap elements
@@ -629,7 +627,7 @@ public class Exchanger<V> {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe U;
+    private static final Unsafe U;
     private static final long BOUND;
     private static final long SLOT;
     private static final long MATCH;
@@ -638,7 +636,7 @@ public class Exchanger<V> {
     static {
         int s;
         try {
-            U = sun.misc.Unsafe.getUnsafe();
+            U = Unsafe.getUnsafe();
             Class<?> ek = Exchanger.class;
             Class<?> nk = Node.class;
             Class<?> ak = Node[].class;

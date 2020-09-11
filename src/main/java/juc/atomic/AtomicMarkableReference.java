@@ -35,6 +35,7 @@
 
 package juc.atomic;
 
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 /**
@@ -192,7 +193,7 @@ public class AtomicMarkableReference<V> {
 
     // Unsafe mechanics
 
-    private static final sun.misc.Unsafe UNSAFE = GetUnsafeFromReflect.getUnsafe();
+    private static final Unsafe UNSAFE = GetUnsafeFromReflect.getUnsafe();
     private static final long pairOffset =
         objectFieldOffset(UNSAFE, "pair", AtomicMarkableReference.class);
 
@@ -200,7 +201,7 @@ public class AtomicMarkableReference<V> {
         return UNSAFE.compareAndSwapObject(this, pairOffset, cmp, val);
     }
 
-    static long objectFieldOffset(sun.misc.Unsafe UNSAFE,
+    static long objectFieldOffset(Unsafe UNSAFE,
                                   String field, Class<?> klazz) {
         try {
             return UNSAFE.objectFieldOffset(klazz.getDeclaredField(field));

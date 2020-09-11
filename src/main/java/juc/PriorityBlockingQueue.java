@@ -37,6 +37,7 @@ package juc;
 
 import juc.locks.Condition;
 import juc.locks.ReentrantLock;
+import sun.misc2.Unsafe;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -1023,12 +1024,12 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E>
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long allocationSpinLockOffset;
 
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
+            UNSAFE = Unsafe.getUnsafe();
             Class<?> k = juc.PriorityBlockingQueue.class;
             allocationSpinLockOffset = UNSAFE.objectFieldOffset
                     (k.getDeclaredField("allocationSpinLock"));

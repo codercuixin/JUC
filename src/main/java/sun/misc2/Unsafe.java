@@ -23,11 +23,12 @@
  * questions.
  */
 
-package sun.misc;
+package sun.misc2;
 
 import java.security.*;
 import java.lang.reflect.*;
 
+import sun.misc.VM;
 import sun.reflect.CallerSensitive;
 import sun.reflect.Reflection;
 

@@ -36,6 +36,7 @@
 package juc;
 //todo 内部实现
 import juc.locks.LockSupport;
+import sun.misc2.Unsafe;
 
 import java.util.function.*;
 /**
@@ -2478,15 +2479,15 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long RESULT;
     private static final long STACK;
     private static final long NEXT;
 
     static {
         try {
-            final sun.misc.Unsafe u;
-            UNSAFE = u = sun.misc.Unsafe.getUnsafe();
+            final Unsafe u;
+            UNSAFE = u = Unsafe.getUnsafe();
             Class<?> k = juc.CompletableFuture.class;
             RESULT = u.objectFieldOffset(k.getDeclaredField("result"));
             STACK = u.objectFieldOffset(k.getDeclaredField("stack"));

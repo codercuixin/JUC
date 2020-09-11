@@ -1,6 +1,7 @@
 package juc.locks;
 
 
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.concurrent.TimeUnit;
@@ -1537,7 +1538,7 @@ public class StampedLock implements java.io.Serializable {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe U;
+    private static final Unsafe U;
     private static final long STATE;
     private static final long WHEAD;
     private static final long WTAIL;

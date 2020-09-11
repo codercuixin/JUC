@@ -1,5 +1,6 @@
 package juc.locks;
 
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.util.Collection;
@@ -1305,7 +1306,7 @@ public class ReentrantReadWriteLock
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long TID_OFFSET;
     static {
         try {

@@ -36,6 +36,7 @@
 package juc;
 
 import juc.atomic.AtomicLong;
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -1524,7 +1525,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         }
 
         // Unsafe mechanics. Note that some are (and must be) the same as in FJP
-        private static final sun.misc.Unsafe U;
+        private static final Unsafe U;
         private static final int ABASE;
         private static final int ASHIFT;
         private static final long QTOP;
@@ -3932,7 +3933,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     // Unsafe mechanics
-    private static final sun.misc.Unsafe U;
+    private static final Unsafe U;
     private static final int ABASE;
     private static final int ASHIFT;
     private static final long CTL;

@@ -1,5 +1,6 @@
 package juc.locks;
 
+import sun.misc2.Unsafe;
 import unsafeTest.GetUnsafeFromReflect;
 
 /**
@@ -64,7 +65,7 @@ import unsafeTest.GetUnsafeFromReflect;
  */
 public class LockSupport {
     // Hotspot implementation via intrinsics API
-    private static final sun.misc.Unsafe UNSAFE;
+    private static final Unsafe UNSAFE;
     private static final long parkBlockerOffset;
     private static final long SEED;
     private static final long PROBE;
